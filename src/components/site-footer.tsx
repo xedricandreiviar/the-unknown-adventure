@@ -69,7 +69,7 @@ export function SiteFooter() {
             <p className="flex gap-4">
               <Link to="/privacy" className="hover:text-gold">Privacy Policy</Link>
               <Link to="/terms" className="hover:text-gold">Terms of Use</Link>
-              <Link to="/privacy#dpa" className="hover:text-gold">Data Privacy Act (RA 10173)</Link>
+              <Link to="/privacy" hash="dpa" className="hover:text-gold">Data Privacy Act (RA 10173)</Link>
             </p>
           </div>
         </div>

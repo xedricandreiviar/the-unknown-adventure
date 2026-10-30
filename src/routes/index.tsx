@@ -15,8 +15,8 @@ import { useLang } from "@/lib/i18n";
 import { SITE } from "@/lib/site";
 import { BOOKING_SLOTS } from "@/lib/site";
 import { FAQS, OFFICIALS, SERVICES } from "@/lib/content";
-import heroAsset from "@/assets/hero-barangay.jpg.asset.json";
-import courtAsset from "@/assets/multipurp.jpg.asset.json";
+import heroAsset from "@/assets/hero-barangay.jpg";
+import courtAsset from "@/assets/multipurp.jpg";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -41,7 +41,7 @@ function Index() {
         kicker={t("hero.kicker")}
         title={t("hero.title")}
         body={t("hero.body")}
-        imageSrc={heroAsset.url}
+        imageSrc={heroAsset}
       >
         <div className="flex flex-wrap gap-3">
           <Button asChild variant="gold" size="lg">
@@ -82,7 +82,7 @@ function Index() {
             </p>
           </div>
           <img
-            src={courtAsset.url}
+            src={courtAsset}
             alt="The Barangay Wawa multi-purpose court"
             className="h-64 w-full rounded-xl object-cover shadow-md ring-1 ring-border md:h-80"
           />

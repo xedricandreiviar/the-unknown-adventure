@@ -6,7 +6,7 @@ import { HotlinesModal } from "@/components/hotlines-modal";
 import { useLang } from "@/lib/i18n";
 import { SITE } from "@/lib/site";
 import { supabase } from "@/integrations/supabase/client";
-import logoAsset from "@/assets/logo.png.asset.json";
+import logoAsset from "@/assets/logo.png";
 
 const NAV = [
   { to: "/", key: "nav.home" },
@@ -92,7 +92,7 @@ export function SiteHeader() {
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-2.5">
           <Link to="/" className="flex items-center gap-3" aria-label={`${SITE.name} home`}>
             <img
-              src={logoAsset.url}
+              src={logoAsset}
               alt={`${SITE.name} seal`}
               className="size-11 rounded-full bg-card shadow-sm ring-1 ring-gold/60"
             />

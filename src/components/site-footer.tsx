@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { MapPin, Phone, Mail, Facebook } from "lucide-react";
 import { SITE } from "@/lib/site";
-import logoAsset from "@/assets/logo.png.asset.json";
+import logoAsset from "@/assets/logo.png";
 
 export function SiteFooter() {
   return (
@@ -10,7 +10,7 @@ export function SiteFooter() {
         <div className="grid gap-10 md:grid-cols-[auto_1fr_1fr]">
           <div className="flex items-start gap-3">
             <img
-              src={logoAsset.url}
+              src={logoAsset}
               alt={`${SITE.name} seal`}
               className="size-16 rounded-full bg-card/90 ring-2 ring-gold/70"
             />

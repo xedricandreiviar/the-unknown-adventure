@@ -152,8 +152,8 @@ function Index() {
             {t("home.officialsTitle")}
           </h2>
           <ul className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {OFFICIALS.slice(0, 4).map((o) => (
-              <li key={o.role} className="rounded-lg border border-border bg-card p-4">
+            {OFFICIALS.slice(0, 4).map((o, i) => (
+              <li key={`${o.role}-${i}`} className="rounded-lg border border-border bg-card p-4">
                 <p className="font-display text-base font-semibold text-forest-deep">{o.role}</p>
                 <p className="text-sm text-muted-foreground">{o.name ?? "Roster coming soon"}</p>
               </li>

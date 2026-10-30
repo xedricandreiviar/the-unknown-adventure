@@ -15,17 +15,14 @@ export function PageHero({
   children?: ReactNode;
 }) {
   return (
-    <section className="relative overflow-hidden border-b border-border">
+    <section className="relative overflow-hidden border-b border-border bg-forest-deep">
       {imageSrc && (
-        <>
-          <img
-            src={imageSrc}
-            alt=""
-            aria-hidden
-            className="absolute inset-0 size-full object-cover"
-          />
-          <div className="absolute inset-0 bg-forest-deep/70" aria-hidden />
-        </>
+        <img
+          src={imageSrc}
+          alt=""
+          aria-hidden
+          className="absolute inset-0 size-full object-cover opacity-40"
+        />
       )}
       <div className="relative mx-auto max-w-6xl px-4 py-12 sm:py-16">
         {kicker && (

@@ -218,9 +218,10 @@
   color: black !important;
 }
 
-@utility hc * {
-  color: black !important;
-  border-color: oklch(0.3 0 0) !important;
+  & * {
+    color: black !important;
+    border-color: oklch(0.3 0 0) !important;
+  }
 }
 
 /* big text mode (PWD toolbar) */

@@ -7,10 +7,16 @@ import { ConsentCheckbox } from "@/components/consent-checkbox";
 import { SERVICES } from "@/lib/content";
 import { SITE } from "@/lib/site";
 import { useLang } from "@/lib/i18n";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { z } from "zod";
+
+const searchSchema = z.object({
+  open: z.string().optional(),
+});
 
 export const Route = createFileRoute("/services")({
+  validateSearch: searchSchema,
   head: () => ({
     meta: [
       { title: `Barangay Services — ${SITE.name}` },
@@ -26,8 +32,56 @@ export const Route = createFileRoute("/services")({
 
 function ServicesPage() {
   const { t } = useLang();
+  // useSearch re-runs on every URL change, including same-page param updates
+  const { open: openParam } = Route.useSearch();
   const [consent, setConsent] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
+
+  // Derive the accordion key from the search param directly
+  const paramKey = openParam
+    ? (() => {
+        const idx = SERVICES.findIndex((s) => s.name === openParam);
+        return idx !== -1 ? `svc-${idx}` : undefined;
+      })()
+    : undefined;
+
+  // accordionValue controls which item is open.
+  // We sync it whenever openParam changes — this covers:
+  //   1. First load from another page
+  //   2. Already on /services and clicking a different item in the nav
+  //   3. Already on /services and clicking the same item again (re-open)
+  const [accordionValue, setAccordionValue] = useState<string | undefined>(paramKey);
+
+  // Track previous param so we can detect "same param clicked again" and force re-open
+  const prevParamRef = useRef<string | undefined>(openParam);
+
+  useEffect(() => {
+    if (!openParam) return;
+
+    const idx = SERVICES.findIndex((s) => s.name === openParam);
+    if (idx === -1) return;
+    const key = `svc-${idx}`;
+
+    if (prevParamRef.current === openParam && accordionValue === key) {
+      // Same item clicked while already open — close then re-open to replay animation
+      setAccordionValue(undefined);
+      const reopen = setTimeout(() => setAccordionValue(key), 30);
+      return () => clearTimeout(reopen);
+    }
+
+    // New item or item was closed — open it
+    setAccordionValue(key);
+    prevParamRef.current = openParam;
+
+    // Scroll into view after the accordion open animation (~200ms)
+    const scroll = setTimeout(() => {
+      itemRefs.current[key]?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 220);
+    return () => clearTimeout(scroll);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openParam]);
+
+  const itemRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   return (
     <div>
@@ -38,29 +92,42 @@ function ServicesPage() {
       />
 
       <Reveal as="section" className="mx-auto max-w-4xl px-4 py-12">
-        <Accordion type="single" collapsible className="space-y-3">
-          {SERVICES.map((s, i) => (
-            <AccordionItem
-              key={s.name}
-              value={`svc-${i}`}
-              className="rounded-lg border border-border bg-card px-4 last:border-b"
-            >
-              <AccordionTrigger className="font-display text-base font-semibold text-forest-deep">
-                {s.name}
-              </AccordionTrigger>
-              <AccordionContent>
-                <p className="text-sm text-muted-foreground">{s.desc}</p>
-                <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-gold-deep">
-                  Bring with you
-                </p>
-                <ul className="mt-1 list-inside list-disc text-sm text-muted-foreground">
-                  {s.requirements.map((r) => (
-                    <li key={r}>{r}</li>
-                  ))}
-                </ul>
-              </AccordionContent>
-            </AccordionItem>
-          ))}
+        <Accordion
+          type="single"
+          collapsible
+          className="space-y-3"
+          value={accordionValue}
+          // User can still manually open/close any item
+          onValueChange={setAccordionValue}
+        >
+          {SERVICES.map((s, i) => {
+            const value = `svc-${i}`;
+            return (
+              <AccordionItem
+                key={s.name}
+                value={value}
+                ref={(el) => { itemRefs.current[value] = el as HTMLDivElement | null; }}
+                className="rounded-lg border border-border bg-card px-4 last:border-b transition-shadow data-[state=open]:shadow-md"
+              >
+                <AccordionTrigger className="font-display text-base font-semibold text-forest-deep">
+                  {s.name}
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="pb-1">
+                    <p className="text-sm text-muted-foreground">{s.desc}</p>
+                    <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-gold-deep">
+                      Bring with you
+                    </p>
+                    <ul className="mt-1 list-inside list-disc text-sm text-muted-foreground">
+                      {s.requirements.map((r) => (
+                        <li key={r}>{r}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            );
+          })}
         </Accordion>
       </Reveal>
 

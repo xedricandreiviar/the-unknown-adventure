@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Accessibility, CalendarDays, ChevronDown, Menu, UserRound, X } from "lucide-react";
+import { Accessibility, CalendarDays, ChevronDown, ClipboardList, Menu, UserRound, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { HotlinesModal } from "@/components/hotlines-modal";
 import { useLang } from "@/lib/i18n";
@@ -32,6 +32,12 @@ const SERVICES_NAV = [
     sublabel: "pwd.nav.sub",
     to: "/pwd",
     highlight: true,
+  },
+  {
+    icon: ClipboardList,
+    label: "nav.track",
+    to: "/track",
+    highlight: false,
   },
 ] as const;
 
@@ -155,7 +161,7 @@ function ServicesMenu({ onNavigate }: { onNavigate?: () => void }) {
           transformOrigin: "top left",
         }}
         // Fixed wide panel anchored below the nav bar — won't clip off-screen
-        className="absolute left-0 top-full z-50 mt-2 flex w-[580px] overflow-hidden rounded-2xl border border-border bg-card shadow-2xl"
+        className="absolute left-0 top-full z-50 mt-2 flex w-[640px] overflow-hidden rounded-2xl border border-border bg-card shadow-2xl"
         onMouseEnter={cancelClose}
         onMouseLeave={scheduleClose}
       >
@@ -181,7 +187,7 @@ function ServicesMenu({ onNavigate }: { onNavigate?: () => void }) {
               <span>
                 <span className="block text-sm font-semibold text-forest-deep">{t(label)}</span>
                 <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
-                  {label === "nav.court" ? "Reserve a 2-hour slot" : "ID, discounts & guides"}
+                  {label === "nav.court" ? "Reserve a 2-hour slot" : label === "nav.pwd" ? "ID, discounts & guides" : "Check your request status"}
                 </span>
               </span>
             </Link>
@@ -207,7 +213,6 @@ function ServicesMenu({ onNavigate }: { onNavigate?: () => void }) {
           <ul className="grid grid-cols-2 gap-1">
             {SERVICES.map((s) => (
               <li key={s.name}>
-                {/* Pass ?open=<name> so the services page auto-opens this accordion item */}
                 <Link
                   to="/services"
                   search={{ open: s.name }}
@@ -383,18 +388,18 @@ export function SiteHeader() {
                     <p className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                       Quick access
                     </p>
-                    <div className="mb-3 grid grid-cols-2 gap-2">
+                    <div className="mb-3 grid grid-cols-3 gap-2">
                       {SERVICES_NAV.map(({ icon: Icon, label, to }) => (
                         <Link
                           key={to}
                           to={to}
                           onClick={() => setMenuOpen(false)}
-                          className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-3 transition-colors hover:bg-secondary active:bg-secondary"
+                          className="flex flex-col items-center gap-1.5 rounded-xl border border-border bg-card px-2 py-3 text-center transition-colors hover:bg-secondary active:bg-secondary"
                         >
                           <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-forest-deep/8 text-forest-deep">
                             <Icon className="size-4" aria-hidden />
                           </span>
-                          <span className="text-sm font-semibold text-forest-deep">{t(label)}</span>
+                          <span className="text-xs font-semibold leading-tight text-forest-deep">{t(label)}</span>
                         </Link>
                       ))}
                     </div>

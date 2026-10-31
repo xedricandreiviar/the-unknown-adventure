@@ -18,6 +18,11 @@ export const SERVICES: Service[] = [
     requirements: ["Valid ID", "Proof of residence"],
   },
   {
+    name: "Complaint / Incident Report",
+    desc: "File a blotter or report a concern for the barangay to act on.",
+    requirements: ["Valid ID", "Details of the incident"],
+  },
+  {
     name: "Barangay Business Clearance",
     desc: "Required before applying for a business permit with Taguig City.",
     requirements: ["Valid ID", "Proof of business address", "Cedula"],
@@ -36,11 +41,6 @@ export const SERVICES: Service[] = [
     name: "First-Time Jobseeker Voucher",
     desc: "Free barangay clearance and cedula for first-time job seekers under RA 11261.",
     requirements: ["Valid ID", "Barangay residency"],
-  },
-  {
-    name: "Complaint / Incident Report",
-    desc: "File a blotter or report a concern for the barangay to act on.",
-    requirements: ["Valid ID", "Details of the incident"],
   },
 ];
 

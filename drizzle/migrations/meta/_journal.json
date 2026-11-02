@@ -1,5 +1,20 @@
 {
   "version": "7",
   "dialect": "postgresql",
-  "entries": []
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1793612096582,
+      "tag": "0000_wawa_full_backend_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793612153646,
+      "tag": "0001_court_slot_status_fn",
+      "breakpoints": true
+    }
+  ]
 }

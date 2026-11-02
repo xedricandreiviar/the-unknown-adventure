@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { reservationSchema, dateString, z } from "@/lib/validation";
+import { reservationSchema, dateString } from "@/lib/validation";
+import { z } from "zod";
+import type { Database } from "@/integrations/supabase/types";
 import { BOOKING_SLOTS } from "@/lib/site";
 
 type Ctx = { supabase: import("@supabase/supabase-js").SupabaseClient; userId: string };

@@ -524,6 +524,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      court_slot_status: {
+        Args: { p_date: string; p_slot: string }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

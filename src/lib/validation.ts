@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export { z };
+
 /** Philippine mobile or landline, e.g. 09123456789, +639123456789, 02-81234567 */
 export const PHONE_RE = /^(09\d{9}|\+639\d{9}|0\d{2,3}-?\d{7})$/;
 

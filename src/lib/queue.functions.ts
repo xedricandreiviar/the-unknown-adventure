@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { requestSchema, dateString, z } from "@/lib/validation";
+import { requestSchema, dateString } from "@/lib/validation";
+import { z } from "zod";
 
 type Ctx = { supabase: import("@supabase/supabase-js").SupabaseClient; userId: string };
 
@@ -134,9 +135,13 @@ export const adminUpdateRequest = createServerFn({ method: "POST" })
         status: z.enum(["pending", "in_queue", "processing", "completed", "rejected", "cancelled"]),
         reason: z.string().trim().max(500).optional(),
       })
-      .refine((d) => d.status !== "rejected" || (d.reason ?? "").length >= 5, {
-        message: "Give a rejection reason (at least 5 characters).",
-      })
+      .refine(
+        (d: { status: string; reason?: string }) =>
+          d.status !== "rejected" || (d.reason ?? "").length >= 5,
+        {
+          message: "Give a rejection reason (at least 5 characters).",
+        },
+      )
       .parse(data),
   )
   .handler(async ({ data, context }) => {

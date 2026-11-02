@@ -2,7 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { settingsSchema, serviceSchema, z } from "@/lib/validation";
+import { settingsSchema, serviceSchema } from "@/lib/validation";
+import { z } from "zod";
 
 /** Publishable client for anonymous public reads (narrow TO-anon SELECT policies). */
 function publicClient() {

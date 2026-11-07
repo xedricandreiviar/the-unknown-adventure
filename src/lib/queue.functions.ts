@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requestSchema, dateString } from "@/lib/validation";
 import { z } from "zod";
+import type { Database } from "@/integrations/supabase/types";
 
 type Ctx = { supabase: import("@supabase/supabase-js").SupabaseClient; userId: string };
 
@@ -22,8 +23,9 @@ async function notify(
 
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 function makeCode(prefix: string) {
+  const random = crypto.getRandomValues(new Uint8Array(6));
   let out = "";
-  for (let i = 0; i < 6; i++) out += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+  for (const value of random) out += CODE_CHARS[value % CODE_CHARS.length];
   return `${prefix}-${out}`;
 }
 
@@ -69,7 +71,7 @@ export const submitRequest = createServerFn({ method: "POST" })
         .insert({ ...data, user_id: context.userId, code: makeCode(service.code) })
         .select("code")
         .single();
-      if (!error) return { code: inserted!.code };
+      if (!error && inserted) return { code: inserted.code };
       if (error.code === "23505") lastError = error.message;
       else throw new Error(error.message);
     }
@@ -85,6 +87,20 @@ export const getMyRequests = createServerFn({ method: "GET" })
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
     return data ?? [];
+  });
+
+export const getMyRequestByCode = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => z.object({ code: z.string().trim().min(3).max(24) }).parse(data))
+  .handler(async ({ data, context }) => {
+    const { data: row, error } = await context.supabase
+      .from("service_requests")
+      .select("code, status, rejection_reason, created_at, service:services(name)")
+      .eq("code", data.code.toUpperCase())
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return row;
   });
 
 export const cancelMyRequest = createServerFn({ method: "POST" })
@@ -106,7 +122,7 @@ export const adminListRequests = createServerFn({ method: "GET" })
   .inputValidator((data: unknown) =>
     z
       .object({
-        status: z.string().optional(),
+        status: z.enum(["pending", "in_queue", "processing", "completed", "rejected", "cancelled"]).optional(),
         from: dateString.optional(),
         to: dateString.optional(),
       })
@@ -135,13 +151,9 @@ export const adminUpdateRequest = createServerFn({ method: "POST" })
         status: z.enum(["pending", "in_queue", "processing", "completed", "rejected", "cancelled"]),
         reason: z.string().trim().max(500).optional(),
       })
-      .refine(
-        (d: { status: string; reason?: string }) =>
-          d.status !== "rejected" || (d.reason ?? "").length >= 5,
-        {
+      .refine((d) => d.status !== "rejected" || (d.reason ?? "").length >= 5, {
           message: "Give a rejection reason (at least 5 characters).",
-        },
-      )
+      })
       .parse(data),
   )
   .handler(async ({ data, context }) => {

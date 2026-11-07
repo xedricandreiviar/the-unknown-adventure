@@ -15,6 +15,13 @@
       "when": 1793612153646,
       "tag": "0001_court_slot_status_fn",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794056580583,
+      "tag": "0002_signup_profile_metadata",
+      "breakpoints": true
     }
   ]
 }

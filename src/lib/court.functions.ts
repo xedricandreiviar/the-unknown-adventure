@@ -112,7 +112,7 @@ export const adminListReservations = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) =>
     z
-      .object({ status: z.string().optional(), from: dateString.optional(), to: dateString.optional() })
+      .object({ status: z.enum(["pending", "approved", "rejected", "cancelled", "completed"]).optional(), from: dateString.optional(), to: dateString.optional() })
       .parse(data),
   )
   .handler(async ({ data, context }) => {
@@ -154,15 +154,15 @@ export const adminUpdateReservation = createServerFn({ method: "POST" })
       .single();
     if (!row) throw new Error("Reservation not found.");
 
-    const values: Record<string, unknown> = {};
+    const values: Database["public"]["Tables"]["court_reservations"]["Update"] = {};
     if (data.status) {
-      values.status = data.status;
-      values.rejection_reason = data.status === "rejected" ? (data.reason ?? null) : null;
+      values["status"] = data.status;
+      values["rejection_reason"] = data.status === "rejected" ? (data.reason ?? null) : null;
     }
-    if (data.res_date) values.res_date = data.res_date;
+    if (data.res_date) values["res_date"] = data.res_date;
     if (data.slot) {
       if (!isValidSlot(data.slot)) throw new Error("Choose one of the daily time slots.");
-      values.slot = data.slot;
+      values["slot"] = data.slot;
     }
     if (data.res_date || data.slot) {
       const newDate = (data.res_date ?? row.res_date) as string;

@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { profileUpdateSchema, rejectReason, z } from "@/lib/validation";
+import type { Database } from "@/integrations/supabase/types";
 
 type Ctx = { supabase: import("@supabase/supabase-js").SupabaseClient; userId: string };
 
@@ -36,7 +37,8 @@ export const updateMyProfile = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => profileUpdateSchema.parse(data))
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase.from("profiles").update(data).eq("id", context.userId);
+    const values = Object.fromEntries(Object.entries(data).filter(([, value]) => value !== undefined)) as Database["public"]["Tables"]["profiles"]["Update"];
+    const { error } = await context.supabase.from("profiles").update(values).eq("id", context.userId);
     if (error) throw new Error(error.message);
     return { ok: true as const };
   });
@@ -117,7 +119,8 @@ export const adminUpdateAccount = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     const { userId, ...values } = data;
-    const { error } = await context.supabase.from("profiles").update(values).eq("id", userId);
+    const cleanValues = Object.fromEntries(Object.entries(values).filter(([, value]) => value !== undefined)) as Database["public"]["Tables"]["profiles"]["Update"];
+    const { error } = await context.supabase.from("profiles").update(cleanValues).eq("id", userId);
     if (error) throw new Error(error.message);
     return { ok: true as const };
   });
@@ -142,10 +145,11 @@ export const adminCreateAccount = createServerFn({ method: "POST" })
       email_confirm: true,
     });
     if (error || !created?.user) throw new Error(error?.message ?? "Could not create the account.");
-    const { userId: _omit, email: _omit2, password: _omit3, ...profile } = data;
+    const { email, password, ...profile } = data;
+    const cleanProfile = Object.fromEntries(Object.entries(profile).filter(([, value]) => value !== undefined)) as Database["public"]["Tables"]["profiles"]["Update"];
     const { error: updateError } = await supabaseAdmin
       .from("profiles")
-      .update({ ...profile, status: "approved" })
+      .update({ ...cleanProfile, status: "approved" })
       .eq("id", created.user.id);
     if (updateError) throw new Error(updateError.message);
     return { ok: true as const };

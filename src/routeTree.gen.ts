@@ -12,7 +12,6 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as AnnouncementsRouteImport } from './routes/announcements'
-import { Route as AuthRouteImport } from './routes/auth'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as CourtBookingRouteImport } from './routes/court-booking'
 import { Route as OfficialsRouteImport } from './routes/officials'
@@ -35,11 +34,6 @@ const AccountRoute = AccountRouteImport.update({
 const AnnouncementsRoute = AnnouncementsRouteImport.update({
   id: '/announcements',
   path: '/announcements',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthRoute = AuthRouteImport.update({
-  id: '/auth',
-  path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ContactRoute = ContactRouteImport.update({
@@ -87,7 +81,6 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
   '/announcements': typeof AnnouncementsRoute
-  '/auth': typeof AuthRoute
   '/contact': typeof ContactRoute
   '/court-booking': typeof CourtBookingRoute
   '/officials': typeof OfficialsRoute
@@ -101,7 +94,6 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
   '/announcements': typeof AnnouncementsRoute
-  '/auth': typeof AuthRoute
   '/contact': typeof ContactRoute
   '/court-booking': typeof CourtBookingRoute
   '/officials': typeof OfficialsRoute
@@ -116,7 +108,6 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
   '/announcements': typeof AnnouncementsRoute
-  '/auth': typeof AuthRoute
   '/contact': typeof ContactRoute
   '/court-booking': typeof CourtBookingRoute
   '/officials': typeof OfficialsRoute
@@ -132,7 +123,6 @@ export interface FileRouteTypes {
     | '/'
     | '/account'
     | '/announcements'
-    | '/auth'
     | '/contact'
     | '/court-booking'
     | '/officials'
@@ -146,7 +136,6 @@ export interface FileRouteTypes {
     | '/'
     | '/account'
     | '/announcements'
-    | '/auth'
     | '/contact'
     | '/court-booking'
     | '/officials'
@@ -160,7 +149,6 @@ export interface FileRouteTypes {
     | '/'
     | '/account'
     | '/announcements'
-    | '/auth'
     | '/contact'
     | '/court-booking'
     | '/officials'
@@ -175,7 +163,6 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccountRoute: typeof AccountRoute
   AnnouncementsRoute: typeof AnnouncementsRoute
-  AuthRoute: typeof AuthRoute
   ContactRoute: typeof ContactRoute
   CourtBookingRoute: typeof CourtBookingRoute
   OfficialsRoute: typeof OfficialsRoute
@@ -207,13 +194,6 @@ declare module '@tanstack/react-router' {
       path: '/announcements'
       fullPath: '/announcements'
       preLoaderRoute: typeof AnnouncementsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth': {
-      id: '/auth'
-      path: '/auth'
-      fullPath: '/auth'
-      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/contact': {
@@ -279,7 +259,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountRoute: AccountRoute,
   AnnouncementsRoute: AnnouncementsRoute,
-  AuthRoute: AuthRoute,
   ContactRoute: ContactRoute,
   CourtBookingRoute: CourtBookingRoute,
   OfficialsRoute: OfficialsRoute,

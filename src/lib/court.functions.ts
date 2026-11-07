@@ -42,6 +42,40 @@ export const getDayAvailability = createServerFn({ method: "GET" })
     return slots;
   });
 
+export const getPublicDayAvailability = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) => z.object({ date: dateString }).parse(data))
+  .handler(async ({ data }) => {
+    const { createClient } = await import("@supabase/supabase-js");
+    const key = process.env["SUPABASE_PUBLISHABLE_KEY"];
+    const url = process.env["SUPABASE_URL"];
+    if (!key || !url) return BOOKING_SLOTS.map((slot) => ({ ...slot, status: "open" }));
+    const publicClient = createClient<Database>(url, key, {
+      auth: { storage: undefined, persistSession: false, autoRefreshToken: false },
+      global: { fetch: (input, init) => {
+        const headers = new Headers(init?.headers);
+        if (headers.get("Authorization") === `Bearer ${key}`) headers.delete("Authorization");
+        headers.set("apikey", key);
+        return fetch(input, { ...init, headers });
+      } },
+    });
+    const { data: blocks, error: blockError } = await publicClient
+      .from("court_blocks")
+      .select("block_date, slot")
+      .eq("block_date", data.date);
+    if (blockError) throw new Error("Court availability is temporarily unavailable.");
+    const { data: reservations, error: reservationError } = await publicClient
+      .from("court_reservations")
+      .select("slot")
+      .eq("res_date", data.date)
+      .in("status", ["pending", "approved"]);
+    if (reservationError) throw new Error("Court availability is temporarily unavailable.");
+    return BOOKING_SLOTS.map((slot) => {
+      const blocked = (blocks ?? []).some((block) => block.slot === null || block.slot === slot.start);
+      const taken = (reservations ?? []).some((reservation) => reservation.slot === slot.start);
+      return { ...slot, status: blocked ? "blocked" : taken ? "taken" : "open" };
+    });
+  });
+
 export const createReservation = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => reservationSchema.parse(data))
@@ -92,6 +126,19 @@ export const getMyReservations = createServerFn({ method: "GET" })
       .order("res_date", { ascending: true });
     if (error) throw new Error(error.message);
     return data ?? [];
+  });
+
+export const getReservationById = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => z.object({ id: z.string().uuid() }).parse(data))
+  .handler(async ({ data, context }) => {
+    const { data: row, error } = await context.supabase
+      .from("court_reservations")
+      .select("*")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return row;
   });
 
 export const cancelMyReservation = createServerFn({ method: "POST" })

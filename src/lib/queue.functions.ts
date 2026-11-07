@@ -89,6 +89,20 @@ export const getMyRequests = createServerFn({ method: "GET" })
     return data ?? [];
   });
 
+export const getMyRequestByCode = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => z.object({ code: z.string().trim().min(3).max(24) }).parse(data))
+  .handler(async ({ data, context }) => {
+    const { data: row, error } = await context.supabase
+      .from("service_requests")
+      .select("code, status, rejection_reason, created_at, service:services(name)")
+      .eq("code", data.code.toUpperCase())
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return row;
+  });
+
 export const cancelMyRequest = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => z.object({ id: z.string().uuid() }).parse(data))

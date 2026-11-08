@@ -8,3 +8,5 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+Application data access belongs in authenticated TanStack server functions, with resident and admin screens calling those functions rather than querying privileged data directly; this keeps authorization enforceable at the data boundary.

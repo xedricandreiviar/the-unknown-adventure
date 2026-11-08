@@ -41,7 +41,6 @@ function AuthPage() {
         if (signInError) throw signInError;
         await navigate({ to: "/account", replace: true });
       } else {
-        if (!flags.is_senior && !flags.is_pwd) throw new Error("Select whether you are registering as a Senior or PWD resident, or both.");
         if (flags.is_senior && !fields.senior_id_number.trim()) throw new Error("Enter your Senior ID number.");
         if (flags.is_pwd && !fields.pwd_id_number.trim()) throw new Error("Enter your PWD ID number.");
         const { data, error: signUpError } = await supabase.auth.signUp({
@@ -97,7 +96,7 @@ function AuthPage() {
               <div className="space-y-1.5"><Label htmlFor="contact_number">Contact number</Label><Input id="contact_number" type="tel" value={fields.contact_number} onChange={(e) => update("contact_number", e.target.value)} required maxLength={20} /></div>
             </div>
             <fieldset className="space-y-3 rounded-md border border-border p-4">
-              <legend className="px-1 font-medium">Optional benefit enrollment</legend>
+              <legend className="px-1 font-medium">Senior and PWD enrollment (optional)</legend>
               <div className="flex flex-wrap gap-5 text-sm">
                 <label className="flex items-center gap-2"><input type="checkbox" checked={flags.is_senior} onChange={(e) => setFlags((f) => ({ ...f, is_senior: e.target.checked }))} />Senior citizen</label>
                 <label className="flex items-center gap-2"><input type="checkbox" checked={flags.is_pwd} onChange={(e) => setFlags((f) => ({ ...f, is_pwd: e.target.checked }))} />Person with disability</label>

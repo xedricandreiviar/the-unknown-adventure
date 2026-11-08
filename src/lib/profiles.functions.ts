@@ -38,6 +38,7 @@ export const updateMyProfile = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => profileUpdateSchema.parse(data))
   .handler(async ({ data, context }) => {
     const values = Object.fromEntries(Object.entries(data).filter(([, value]) => value !== undefined)) as Database["public"]["Tables"]["profiles"]["Update"];
+    if (values.sex === "") values.sex = null;
     const { error } = await context.supabase.from("profiles").update(values).eq("id", context.userId);
     if (error) throw new Error(error.message);
     return { ok: true as const };

@@ -14,7 +14,6 @@ import { Route as AccountRouteImport } from './routes/account'
 import { Route as AnnouncementsRouteImport } from './routes/announcements'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as ContactRouteImport } from './routes/contact'
-import { Route as CourtBookingRouteImport } from './routes/court-booking'
 import { Route as OfficialsRouteImport } from './routes/officials'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as PwdRouteImport } from './routes/pwd'
@@ -45,11 +44,6 @@ const AuthRoute = AuthRouteImport.update({
 const ContactRoute = ContactRouteImport.update({
   id: '/contact',
   path: '/contact',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CourtBookingRoute = CourtBookingRouteImport.update({
-  id: '/court-booking',
-  path: '/court-booking',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OfficialsRoute = OfficialsRouteImport.update({
@@ -89,7 +83,6 @@ export interface FileRoutesByFullPath {
   '/announcements': typeof AnnouncementsRoute
   '/auth': typeof AuthRoute
   '/contact': typeof ContactRoute
-  '/court-booking': typeof CourtBookingRoute
   '/officials': typeof OfficialsRoute
   '/privacy': typeof PrivacyRoute
   '/pwd': typeof PwdRoute
@@ -103,7 +96,6 @@ export interface FileRoutesByTo {
   '/announcements': typeof AnnouncementsRoute
   '/auth': typeof AuthRoute
   '/contact': typeof ContactRoute
-  '/court-booking': typeof CourtBookingRoute
   '/officials': typeof OfficialsRoute
   '/privacy': typeof PrivacyRoute
   '/pwd': typeof PwdRoute
@@ -118,7 +110,6 @@ export interface FileRoutesById {
   '/announcements': typeof AnnouncementsRoute
   '/auth': typeof AuthRoute
   '/contact': typeof ContactRoute
-  '/court-booking': typeof CourtBookingRoute
   '/officials': typeof OfficialsRoute
   '/privacy': typeof PrivacyRoute
   '/pwd': typeof PwdRoute
@@ -134,7 +125,6 @@ export interface FileRouteTypes {
     | '/announcements'
     | '/auth'
     | '/contact'
-    | '/court-booking'
     | '/officials'
     | '/privacy'
     | '/pwd'
@@ -148,7 +138,6 @@ export interface FileRouteTypes {
     | '/announcements'
     | '/auth'
     | '/contact'
-    | '/court-booking'
     | '/officials'
     | '/privacy'
     | '/pwd'
@@ -162,7 +151,6 @@ export interface FileRouteTypes {
     | '/announcements'
     | '/auth'
     | '/contact'
-    | '/court-booking'
     | '/officials'
     | '/privacy'
     | '/pwd'
@@ -177,7 +165,6 @@ export interface RootRouteChildren {
   AnnouncementsRoute: typeof AnnouncementsRoute
   AuthRoute: typeof AuthRoute
   ContactRoute: typeof ContactRoute
-  CourtBookingRoute: typeof CourtBookingRoute
   OfficialsRoute: typeof OfficialsRoute
   PrivacyRoute: typeof PrivacyRoute
   PwdRoute: typeof PwdRoute
@@ -221,13 +208,6 @@ declare module '@tanstack/react-router' {
       path: '/contact'
       fullPath: '/contact'
       preLoaderRoute: typeof ContactRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/court-booking': {
-      id: '/court-booking'
-      path: '/court-booking'
-      fullPath: '/court-booking'
-      preLoaderRoute: typeof CourtBookingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/officials': {
@@ -281,7 +261,6 @@ const rootRouteChildren: RootRouteChildren = {
   AnnouncementsRoute: AnnouncementsRoute,
   AuthRoute: AuthRoute,
   ContactRoute: ContactRoute,
-  CourtBookingRoute: CourtBookingRoute,
   OfficialsRoute: OfficialsRoute,
   PrivacyRoute: PrivacyRoute,
   PwdRoute: PwdRoute,

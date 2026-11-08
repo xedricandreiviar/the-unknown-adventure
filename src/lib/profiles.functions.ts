@@ -73,6 +73,9 @@ export const adminSetAccountStatus = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
+    if (data.userId === context.userId && data.status !== "approved") {
+      throw new Error("You can't change your own account status.");
+    }
     const { error } = await context.supabase
       .from("profiles")
       .update({
@@ -161,6 +164,7 @@ export const adminDeleteAccount = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ userId: z.string().uuid() }).parse(data))
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
+    if (data.userId === context.userId) throw new Error("You can't delete your own account.");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.auth.admin.deleteUser(data.userId);
     if (error) throw new Error(error.message);

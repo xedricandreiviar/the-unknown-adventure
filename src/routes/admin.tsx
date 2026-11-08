@@ -1,0 +1,108 @@
+import { createFileRoute, Link, Outlet } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useEffect, useState } from "react";
+import { PageHero } from "@/components/page-hero";
+import { Button } from "@/components/ui/button";
+import { AdminContext } from "@/components/admin/admin-context";
+import { getMyProfile } from "@/lib/profiles.functions";
+import { SITE } from "@/lib/site";
+
+export const Route = createFileRoute("/admin")({
+  head: () => ({
+    meta: [{ title: `Admin — ${SITE.name}` }, { name: "robots", content: "noindex" }],
+  }),
+  component: AdminLayout,
+});
+
+const SECTIONS = [
+  { to: "/admin/accounts", label: "Accounts" },
+  { to: "/admin/requests", label: "Requests" },
+] as const;
+
+type Access =
+  { state: "loading" } | { state: "denied"; message: string } | { state: "ok"; userId: string };
+
+function AdminLayout() {
+  const profileFn = useServerFn(getMyProfile);
+  const [access, setAccess] = useState<Access>({ state: "loading" });
+
+  useEffect(() => {
+    let active = true;
+    profileFn()
+      .then(({ profile, isAdmin }) => {
+        if (!active) return;
+        if (profile && isAdmin) setAccess({ state: "ok", userId: profile.id });
+        else
+          setAccess({
+            state: "denied",
+            message: profile
+              ? "This area is for barangay administrators only."
+              : "Sign in to continue.",
+          });
+      })
+      .catch(() => {
+        if (active)
+          setAccess({
+            state: "denied",
+            message: "Sign in with an administrator account to continue.",
+          });
+      });
+    return () => {
+      active = false;
+    };
+  }, [profileFn]);
+
+  if (access.state === "loading") {
+    return (
+      <div>
+        <PageHero kicker="Barangay admin" title="Admin panel" />
+        <div className="mx-auto max-w-6xl px-4 py-12 text-sm text-muted-foreground">
+          Checking your access…
+        </div>
+      </div>
+    );
+  }
+
+  if (access.state === "denied") {
+    return (
+      <div>
+        <PageHero kicker="Barangay admin" title="Admin panel" />
+        <div className="mx-auto max-w-3xl px-4 py-12">
+          <p role="alert" className="text-sm text-destructive">
+            {access.message}
+          </p>
+          <Button asChild variant="gold" className="mt-4">
+            <Link to="/auth">Log in / Sign up</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <AdminContext.Provider value={{ userId: access.userId }}>
+      <PageHero
+        kicker="Barangay admin"
+        title="Admin panel"
+        body="Review accounts and manage the service queue."
+      />
+      <div className="border-b border-border bg-background">
+        <nav aria-label="Admin sections" className="mx-auto flex max-w-6xl gap-1 px-4">
+          {SECTIONS.map((section) => (
+            <Link
+              key={section.to}
+              to={section.to}
+              className="border-b-2 border-transparent px-4 py-3 text-sm font-medium text-muted-foreground hover:text-forest-deep"
+              activeProps={{ className: "border-gold-deep text-forest-deep" }}
+            >
+              {section.label}
+            </Link>
+          ))}
+        </nav>
+      </div>
+      <div className="mx-auto max-w-6xl px-4 py-8">
+        <Outlet />
+      </div>
+    </AdminContext.Provider>
+  );
+}

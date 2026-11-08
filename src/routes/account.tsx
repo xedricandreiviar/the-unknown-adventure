@@ -43,6 +43,7 @@ function AccountPage() {
   const reportsFn = useServerFn(getMyProblemReports);
   const releasesFn = useServerFn(getMyBenefitReleases);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [fields, setFields] = useState({ first_name: "", middle_name: "", last_name: "", street: "", purok: "", barangay: "Wawa", contact_number: "", senior_id_number: "", pwd_id_number: "", pwd_disability_type: "", is_senior: false, is_pwd: false });
   const [requests, setRequests] = useState<Array<{ id: string; code: string; status: string; created_at: string; rejection_reason: string | null; service: { name: string } | null }>>([]);
   const [reservations, setReservations] = useState<Array<{ id: string; res_date: string; slot: string; purpose: string; status: string }>>([]);
@@ -62,6 +63,7 @@ function AccountPage() {
         if (!result.profile) throw new Error("Your account profile could not be found.");
         const person = result.profile as Profile;
         setProfile(person);
+        setIsAdmin(result.isAdmin);
         setFields({ first_name: person.first_name, middle_name: person.middle_name, last_name: person.last_name, street: person.street, purok: person.purok, barangay: person.barangay, contact_number: person.contact_number, senior_id_number: person.senior_id_number ?? "", pwd_id_number: person.pwd_id_number ?? "", pwd_disability_type: person.pwd_disability_type ?? "", is_senior: person.is_senior, is_pwd: person.is_pwd });
         setRequests(requestRows); setReservations(reservationRows); setNotifications(notificationRows); setReports(reportRows); setReleases(releaseRows);
       })
@@ -118,7 +120,7 @@ function AccountPage() {
 
   return <div>
     <PageHero kicker="Resident account" title={`${profile.first_name} ${profile.last_name}`} body={profile.email}>
-      <div className="flex flex-wrap items-center gap-3"><StatusBadge status={profile.status} /><Button variant="outline" onClick={() => void signOut()}><LogOut className="mr-2 size-4" aria-hidden />Sign out</Button></div>
+      <div className="flex flex-wrap items-center gap-3"><StatusBadge status={profile.status} />{isAdmin && <Button asChild variant="gold"><Link to="/admin">Admin panel</Link></Button>}<Button variant="outline" onClick={() => void signOut()}><LogOut className="mr-2 size-4" aria-hidden />Sign out</Button></div>
     </PageHero>
     {error && <p role="alert" className="mx-auto max-w-6xl px-4 pt-5 text-sm text-destructive">{error}</p>}{message && <p role="status" className="mx-auto max-w-6xl px-4 pt-5 text-sm text-forest">{message}</p>}
     {profile.status !== "approved" && <div className="mx-auto max-w-6xl px-4 pt-6"><div className="flex gap-3 border-l-4 border-gold-deep bg-gold-soft/30 p-4 text-sm"><TriangleAlert className="size-5 shrink-0 text-gold-deep" aria-hidden /><div><p className="font-semibold">{profile.status === "pending" ? "Your account is awaiting barangay approval." : profile.status === "rejected" ? "Your account application was not approved." : "Your account is currently deactivated."}</p>{profile.rejection_reason && <p className="mt-1">{profile.rejection_reason}</p>}</div></div></div>}

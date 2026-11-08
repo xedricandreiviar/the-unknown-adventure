@@ -76,6 +76,33 @@ const FILTERS: Array<{ key: AccountStatus | "all"; label: string }> = [
   { key: "all", label: "All" },
 ];
 
+const NO_NAME = "No name on file";
+
+/** Full name, or a clear fallback for accounts that never filled in a profile. */
+function displayName(account: Pick<Account, "first_name" | "middle_name" | "last_name">) {
+  const name = [account.first_name, account.middle_name, account.last_name]
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(" ");
+  return name || NO_NAME;
+}
+
+/** Name for messages and dialogs: the full name, or the email when no name is on file. */
+function accountLabel(
+  account: Pick<Account, "first_name" | "middle_name" | "last_name" | "email">,
+) {
+  const name = displayName(account);
+  return name === NO_NAME ? account.email : name;
+}
+
+/** Street and purok, skipping whichever parts are empty. */
+function displayAddress(account: Pick<Account, "street" | "purok">) {
+  return [account.street, account.purok]
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(", ");
+}
+
 function AccountsPage() {
   const { userId } = useAdmin();
   const listFn = useServerFn(adminListAccounts);
@@ -160,12 +187,7 @@ function AccountsPage() {
     const target = rejecting;
     setRejecting(null);
     setReason("");
-    await changeStatus(
-      target,
-      "rejected",
-      `${target.first_name} ${target.last_name} was rejected.`,
-      trimmed,
-    );
+    await changeStatus(target, "rejected", `${accountLabel(target)} was rejected.`, trimmed);
   };
 
   const confirmDelete = async () => {
@@ -174,7 +196,7 @@ function AccountsPage() {
     setDeleting(null);
     await run(
       () => deleteFn({ data: { userId: target.id } }),
-      `${target.first_name} ${target.last_name} was deleted.`,
+      `${accountLabel(target)} was deleted.`,
     );
   };
 
@@ -261,7 +283,7 @@ function AccountsPage() {
                   <TableRow key={account.id}>
                     <TableCell>
                       <p className="font-medium">
-                        {account.first_name} {account.middle_name} {account.last_name}
+                        {displayName(account)}
                         {isSelf && (
                           <span className="ml-2 text-xs text-muted-foreground">(you)</span>
                         )}
@@ -270,7 +292,9 @@ function AccountsPage() {
                       <p className="text-xs text-muted-foreground">{account.contact_number}</p>
                     </TableCell>
                     <TableCell className="text-sm">
-                      {account.street}, {account.purok}
+                      {displayAddress(account) || (
+                        <span className="text-xs text-muted-foreground">No address on file</span>
+                      )}
                       <br />
                       <span className="text-xs text-muted-foreground">{account.barangay}</span>
                     </TableCell>
@@ -342,7 +366,7 @@ function AccountsPage() {
                                   void changeStatus(
                                     account,
                                     "approved",
-                                    `${account.first_name} ${account.last_name} was approved.`,
+                                    `${accountLabel(account)} was approved.`,
                                   )
                                 }
                               >
@@ -372,7 +396,7 @@ function AccountsPage() {
                                   void changeStatus(
                                     account,
                                     "suspended",
-                                    `${account.first_name} ${account.last_name} was deactivated.`,
+                                    `${accountLabel(account)} was deactivated.`,
                                   )
                                 }
                               >
@@ -388,7 +412,7 @@ function AccountsPage() {
                                   void changeStatus(
                                     account,
                                     "approved",
-                                    `${account.first_name} ${account.last_name} was reactivated.`,
+                                    `${accountLabel(account)} was reactivated.`,
                                   )
                                 }
                               >
@@ -429,7 +453,7 @@ function AccountsPage() {
             <DialogTitle>Reject account</DialogTitle>
             <DialogDescription>
               {rejecting
-                ? `${rejecting.first_name} ${rejecting.last_name} will see this reason on their account page.`
+                ? `${accountLabel(rejecting)} will see this reason on their account page.`
                 : ""}
             </DialogDescription>
           </DialogHeader>
@@ -475,7 +499,7 @@ function AccountsPage() {
             <AlertDialogTitle>Delete this account?</AlertDialogTitle>
             <AlertDialogDescription>
               {deleting
-                ? `${deleting.first_name} ${deleting.last_name} (${deleting.email}) will be permanently removed and can no longer sign in. This cannot be undone.`
+                ? `${accountLabel(deleting)}${accountLabel(deleting) === deleting.email ? "" : ` (${deleting.email})`} will be permanently removed and can no longer sign in. This cannot be undone.`
                 : ""}
             </AlertDialogDescription>
           </AlertDialogHeader>

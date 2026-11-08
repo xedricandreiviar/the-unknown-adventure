@@ -88,6 +88,17 @@ function AccountPage() {
                 with your reference code.
               </p>
             </div>
+            <div className="rounded-xl border border-border bg-card p-6">
+              <p className="font-display text-base font-semibold text-forest-deep">
+                PWD and senior citizen registry
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Apply, follow your application, and see your pension and benefit releases.
+              </p>
+              <Button asChild variant="gold" size="sm" className="mt-3">
+                <Link to="/registry">Open registry</Link>
+              </Button>
+            </div>
             <Button variant="outline" onClick={signOut} className="gap-2">
               <LogOut className="size-4" aria-hidden />
               Sign out

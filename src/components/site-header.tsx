@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Accessibility, CalendarDays, ChevronDown, ClipboardList, Menu, UserRound, X } from "lucide-react";
+import { Accessibility, CalendarDays, ChevronDown, ClipboardList, Menu, UserPlus, UserRound, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { HotlinesModal } from "@/components/hotlines-modal";
 import { useLang } from "@/lib/i18n";
@@ -31,6 +31,12 @@ const SERVICES_NAV = [
     label: "nav.pwd",
     sublabel: "pwd.nav.sub",
     to: "/pwd",
+    highlight: true,
+  },
+  {
+    icon: UserPlus,
+    label: "nav.registry",
+    to: "/registry",
     highlight: true,
   },
   {
@@ -187,7 +193,7 @@ function ServicesMenu({ onNavigate }: { onNavigate?: () => void }) {
               <span>
                 <span className="block text-sm font-semibold text-forest-deep">{t(label)}</span>
                 <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
-                  {label === "nav.court" ? "Reserve a 2-hour slot" : label === "nav.pwd" ? "ID, discounts & guides" : "Check your request status"}
+                  {label === "nav.court" ? "Reserve a 2-hour slot" : label === "nav.pwd" ? "ID, discounts & guides" : label === "nav.registry" ? "Apply and see your benefits" : "Check your birthday and cash gifts"}
                 </span>
               </span>
             </Link>
@@ -388,7 +394,7 @@ export function SiteHeader() {
                     <p className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                       Quick access
                     </p>
-                    <div className="mb-3 grid grid-cols-3 gap-2">
+                    <div className="mb-3 grid grid-cols-2 gap-2">
                       {SERVICES_NAV.map(({ icon: Icon, label, to }) => (
                         <Link
                           key={to}

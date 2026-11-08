@@ -14,16 +14,297 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      benefit_releases: {
+        Row: {
+          amount: number | null
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          period: string | null
+          registrant_id: string
+          release_date: string | null
+          status: Database["public"]["Enums"]["release_status"]
+          benefit_type: string
+          benefit_year: number
+          claimant_name: string | null
+          claimant_relationship: string | null
+          claimed_at: string | null
+          claimed_by_type: string | null
+          id_presented: boolean
+        }
+        Insert: {
+          amount?: number | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          period?: string | null
+          registrant_id: string
+          release_date?: string | null
+          status?: Database["public"]["Enums"]["release_status"]
+          benefit_type: string
+          benefit_year?: number
+          claimant_name?: string | null
+          claimant_relationship?: string | null
+          claimed_at?: string | null
+          claimed_by_type?: string | null
+          id_presented?: boolean
+        }
+        Update: {
+          amount?: number | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          period?: string | null
+          registrant_id?: string
+          release_date?: string | null
+          status?: Database["public"]["Enums"]["release_status"]
+          benefit_type?: string
+          benefit_year?: number
+          claimant_name?: string | null
+          claimant_relationship?: string | null
+          claimed_at?: string | null
+          claimed_by_type?: string | null
+          id_presented?: boolean
+        }
+        Relationships: []
+      }
+      registrants: {
+        Row: {
+          address: string
+          birth_date: string
+          category: Database["public"]["Enums"]["registry_category"]
+          civil_status: string | null
+          contact_number: string | null
+          created_at: string
+          disability_type: string | null
+          encoded_by: string | null
+          full_name: string
+          id: string
+          id_number: string | null
+          pension_applicant: boolean
+          receives_other_pension: boolean
+          reference_code: string
+          rejection_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          sex: string
+          source: Database["public"]["Enums"]["registry_source"]
+          status: Database["public"]["Enums"]["registry_status"]
+          updated_at: string
+          user_id: string | null
+          applicant_type: string
+          chk_disability: boolean
+          chk_name_dob: boolean
+          chk_photo_match: boolean
+          chk_representative: boolean
+          chk_residency: boolean
+          id_expiry: string | null
+          rep_contact_number: string | null
+          rep_full_name: string | null
+          rep_relationship: string | null
+        }
+        Insert: {
+          address: string
+          birth_date: string
+          category: Database["public"]["Enums"]["registry_category"]
+          civil_status?: string | null
+          contact_number?: string | null
+          created_at?: string
+          disability_type?: string | null
+          encoded_by?: string | null
+          full_name: string
+          id?: string
+          id_number?: string | null
+          pension_applicant?: boolean
+          receives_other_pension?: boolean
+          reference_code?: string
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          sex: string
+          source?: Database["public"]["Enums"]["registry_source"]
+          status?: Database["public"]["Enums"]["registry_status"]
+          updated_at?: string
+          user_id?: string | null
+          applicant_type?: string
+          chk_disability?: boolean
+          chk_name_dob?: boolean
+          chk_photo_match?: boolean
+          chk_representative?: boolean
+          chk_residency?: boolean
+          id_expiry?: string | null
+          rep_contact_number?: string | null
+          rep_full_name?: string | null
+          rep_relationship?: string | null
+        }
+        Update: {
+          address?: string
+          birth_date?: string
+          category?: Database["public"]["Enums"]["registry_category"]
+          civil_status?: string | null
+          contact_number?: string | null
+          created_at?: string
+          disability_type?: string | null
+          encoded_by?: string | null
+          full_name?: string
+          id?: string
+          id_number?: string | null
+          pension_applicant?: boolean
+          receives_other_pension?: boolean
+          reference_code?: string
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          sex?: string
+          source?: Database["public"]["Enums"]["registry_source"]
+          status?: Database["public"]["Enums"]["registry_status"]
+          updated_at?: string
+          user_id?: string | null
+          applicant_type?: string
+          chk_disability?: boolean
+          chk_name_dob?: boolean
+          chk_photo_match?: boolean
+          chk_representative?: boolean
+          chk_residency?: boolean
+          id_expiry?: string | null
+          rep_contact_number?: string | null
+          rep_full_name?: string | null
+          rep_relationship?: string | null
+        }
+        Relationships: []
+      }
+      registrant_documents: {
+        Row: {
+          created_at: string
+          doc_type: string
+          file_name: string
+          id: string
+          mime_type: string
+          note: string | null
+          registrant_id: string
+          size_bytes: number
+          storage_path: string
+          uploaded_by: string | null
+          verification_status: string
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          doc_type: string
+          file_name: string
+          id?: string
+          mime_type: string
+          note?: string | null
+          registrant_id: string
+          size_bytes: number
+          storage_path: string
+          uploaded_by?: string | null
+          verification_status?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          doc_type?: string
+          file_name?: string
+          id?: string
+          mime_type?: string
+          note?: string | null
+          registrant_id?: string
+          size_bytes?: number
+          storage_path?: string
+          uploaded_by?: string | null
+          verification_status?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: []
+      }
+      registry_audit: {
+        Row: {
+          action: string
+          actor: string | null
+          created_at: string
+          details: string | null
+          id: string
+          registrant_id: string
+        }
+        Insert: {
+          action: string
+          actor?: string | null
+          created_at?: string
+          details?: string | null
+          id?: string
+          registrant_id: string
+        }
+        Update: {
+          action?: string
+          actor?: string | null
+          created_at?: string
+          details?: string | null
+          id?: string
+          registrant_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: { _role: Database["public"]["Enums"]["app_role"]; _user_id: string }
+        Returns: boolean
+      }
+      registrant_blockers: {
+        Args: { _registrant_id: string }
+        Returns: string[]
+      }
+      senior_gift_amount: {
+        Args: { _age: number }
+        Returns: number | null
+      }
+      track_registration: {
+        Args: { _code: string; _year?: number }
+        Returns: {
+          benefit_year: number
+          category: Database["public"]["Enums"]["registry_category"]
+          incentives: Json
+          reference_code: string
+          senior_gift_amount: number | null
+          status: Database["public"]["Enums"]["registry_status"]
+          updated_at: string
+        }[]
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "resident"
+      registry_category: "pwd" | "senior"
+      registry_source: "online" | "walk_in"
+      registry_status: "pending" | "approved" | "rejected"
+      release_status: "scheduled" | "released" | "unclaimed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +431,12 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "resident"],
+      registry_category: ["pwd", "senior"],
+      registry_source: ["online", "walk_in"],
+      registry_status: ["pending", "approved", "rejected"],
+      release_status: ["scheduled", "released", "unclaimed"],
+    },
   },
 } as const

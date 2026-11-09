@@ -62,7 +62,11 @@ export const adminUpdateProblemReport = createServerFn({ method: "POST" })
       id: z.string().uuid(),
       status: z.enum(["submitted", "under_review", "in_progress", "resolved", "rejected"]),
       admin_reply: z.string().trim().max(1000).optional(),
-    }).parse(input),
+    })
+      .refine((d) => d.status !== "rejected" || (d.admin_reply ?? "").length >= 5, {
+        message: "Give a rejection reason (at least 5 characters).",
+      })
+      .parse(input),
   )
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
@@ -74,7 +78,12 @@ export const adminUpdateProblemReport = createServerFn({ method: "POST" })
     if (!report) throw new Error("Report not found.");
     const { error } = await context.supabase
       .from("problem_reports")
-      .update({ status: data.status, admin_reply: data.admin_reply ?? null })
+      // Keep any earlier reply when the admin only moves the status along.
+      .update(
+        data.admin_reply
+          ? { status: data.status, admin_reply: data.admin_reply }
+          : { status: data.status },
+      )
       .eq("id", data.id);
     if (error) throw new Error(error.message);
     const { error: notificationError } = await context.supabase.from("notifications").insert({

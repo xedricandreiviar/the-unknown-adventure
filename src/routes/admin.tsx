@@ -17,6 +17,7 @@ export const Route = createFileRoute("/admin")({
 const SECTIONS = [
   { to: "/admin/accounts", label: "Accounts" },
   { to: "/admin/requests", label: "Requests" },
+  { to: "/admin/problems", label: "Problems" },
 ] as const;
 
 type Access =

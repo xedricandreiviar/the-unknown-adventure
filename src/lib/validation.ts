@@ -97,6 +97,18 @@ export const problemSchema = z.object({
   barangay: required("Barangay", 60),
 });
 
+/** Categories a resident can pick when reporting a problem. */
+export const PROBLEM_CATEGORIES = [
+  "Garbage / waste",
+  "Streetlight / electricity",
+  "Road / drainage",
+  "Flooding",
+  "Noise",
+  "Peace and order",
+  "Stray animals",
+  "Other",
+] as const;
+
 export const settingsSchema = z.object({
   hall_address: required("Barangay hall address", 200),
   office_hours: required("Office hours", 120),

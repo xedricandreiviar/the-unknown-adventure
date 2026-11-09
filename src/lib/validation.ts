@@ -95,6 +95,8 @@ export const problemSchema = z.object({
   street: required("Street", 120),
   purok: required("Purok / Zone", 60),
   barangay: required("Barangay", 60),
+  /** Path of an optional photo in the uploads bucket. */
+  photo_path: z.string().trim().max(400).optional(),
 });
 
 /** Categories a resident can pick when reporting a problem. */

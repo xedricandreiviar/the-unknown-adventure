@@ -16,6 +16,7 @@ import {
 import { PageHero } from "@/components/page-hero";
 import { Reveal } from "@/components/reveal";
 import { getMyProfile } from "@/lib/profiles.functions";
+import { supabase } from "@/integrations/supabase/client";
 import { getSiteData } from "@/lib/settings.functions";
 import { submitProblemReport } from "@/lib/problems.functions";
 import { PROBLEM_CATEGORIES, problemSchema } from "@/lib/validation";
@@ -37,6 +38,7 @@ export const Route = createFileRoute("/report")({
 });
 
 type ResidentProfile = {
+  id: string;
   status: string;
   street: string;
   purok: string;
@@ -52,6 +54,12 @@ type Fields = {
 };
 
 const MAX_DESCRIPTION = 2000;
+const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
+const PHOTO_TYPES: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
 
 function ReportPage() {
   const siteFn = useServerFn(getSiteData);
@@ -74,6 +82,9 @@ function ReportPage() {
   const [busy, setBusy] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [done, setDone] = useState(false);
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [photoError, setPhotoError] = useState("");
+  const [photoInput, setPhotoInput] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -120,16 +131,49 @@ function ReportPage() {
   }
   const shown = (key: keyof Fields) => (attempted ? errors[key] : undefined);
 
+  const choosePhoto = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    setPhotoError("");
+    if (!file) {
+      setPhoto(null);
+      return;
+    }
+    if (!PHOTO_TYPES[file.type]) {
+      setPhoto(null);
+      setPhotoError("Choose a JPG, PNG, or WebP photo.");
+      setPhotoInput((count) => count + 1);
+      return;
+    }
+    if (file.size > MAX_PHOTO_BYTES) {
+      setPhoto(null);
+      setPhotoError("The photo must be 5 MB or smaller.");
+      setPhotoInput((count) => count + 1);
+      return;
+    }
+    setPhoto(file);
+  };
+
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setAttempted(true);
     setSubmitError("");
-    if (!parsed.success) return;
+    if (!parsed.success || !profile) return;
     setBusy(true);
+    let photoPath: string | undefined;
     try {
-      await submitFn({ data: parsed.data });
+      if (photo) {
+        const path = `${profile.id}/problems/${crypto.randomUUID()}.${PHOTO_TYPES[photo.type]}`;
+        const { error: uploadError } = await supabase.storage.from("uploads").upload(path, photo);
+        if (uploadError) {
+          throw new Error("Could not upload the photo. Check your connection and try again.");
+        }
+        photoPath = path;
+      }
+      await submitFn({ data: { ...parsed.data, photo_path: photoPath } });
       setDone(true);
     } catch (cause) {
+      // Don't leave a photo behind when the report itself was not saved.
+      if (photoPath) void supabase.storage.from("uploads").remove([photoPath]);
       setSubmitError(cause instanceof Error ? cause.message : "Could not send the report.");
     } finally {
       setBusy(false);
@@ -141,6 +185,9 @@ function ReportPage() {
     setAttempted(false);
     setSubmitError("");
     setDone(false);
+    setPhoto(null);
+    setPhotoError("");
+    setPhotoInput((count) => count + 1);
   };
 
   const hero = (
@@ -324,6 +371,26 @@ function ReportPage() {
               </div>
             </div>
           </fieldset>
+
+          <div className="space-y-2">
+            <Label htmlFor="report-photo">Photo (optional)</Label>
+            <Input
+              key={photoInput}
+              id="report-photo"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={choosePhoto}
+              aria-invalid={!!photoError}
+            />
+            <p className="text-xs text-muted-foreground">
+              A clear photo helps the barangay find the problem. JPG, PNG or WebP, up to 5 MB.
+            </p>
+            {photoError && (
+              <p role="alert" className="text-sm text-destructive">
+                {photoError}
+              </p>
+            )}
+          </div>
 
           {submitError && (
             <p role="alert" className="text-sm text-destructive">

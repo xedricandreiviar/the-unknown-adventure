@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PROBLEM_ACTIVE, StatusBadge } from "@/components/status-badge";
+import { ReportPhotoButton } from "@/components/report-photo-button";
 
 export type MyReport = {
   id: string;
@@ -20,6 +21,7 @@ export type MyReport = {
   created_at: string;
   updated_at?: string;
   admin_reply: string | null;
+  photo_path?: string | null;
 };
 
 type View = "active" | "finished";
@@ -95,6 +97,11 @@ export function MyReportsTable({ reports }: { reports: MyReport[] }) {
                     <p className="line-clamp-2" title={item.description}>
                       {item.description}
                     </p>
+                    {item.photo_path && (
+                      <div className="mt-2">
+                        <ReportPhotoButton reportId={item.id} />
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell>
                     <StatusBadge status={item.status} />

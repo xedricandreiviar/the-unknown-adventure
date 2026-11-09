@@ -36,11 +36,32 @@ export const submitProblemReport = createServerFn({ method: "POST" })
       .eq("key", "problems")
       .maybeSingle();
     if (flag && !flag.enabled) throw new Error("Problem reports are temporarily unavailable.");
+    if (data.photo_path && !data.photo_path.startsWith(`${context.userId}/`)) {
+      throw new Error("That photo does not belong to your account.");
+    }
     const { error } = await context.supabase
       .from("problem_reports")
-      .insert({ ...data, user_id: context.userId });
+      .insert({ ...data, photo_path: data.photo_path ?? null, user_id: context.userId });
     if (error) throw new Error(error.message);
     return { ok: true as const };
+  });
+
+/** A short-lived link to a report's photo. Works for the resident who filed it and for admins. */
+export const getReportPhotoUrl = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { data: report } = await context.supabase
+      .from("problem_reports")
+      .select("photo_path")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (!report?.photo_path) throw new Error("This report has no photo.");
+    const { data: signed, error } = await context.supabase.storage
+      .from("uploads")
+      .createSignedUrl(report.photo_path, 300);
+    if (error || !signed) throw new Error(error?.message ?? "Could not open the photo.");
+    return { url: signed.signedUrl };
   });
 
 export const adminListProblemReports = createServerFn({ method: "GET" })

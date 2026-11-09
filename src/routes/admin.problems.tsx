@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { PROBLEM_ACTIVE, StatusBadge } from "@/components/status-badge";
+import { ReportPhotoButton } from "@/components/report-photo-button";
 import { adminListProblemReports, adminUpdateProblemReport } from "@/lib/problems.functions";
 
 export const Route = createFileRoute("/admin/problems")({
@@ -39,6 +40,7 @@ type Report = {
   barangay: string;
   status: ProblemStatus;
   admin_reply: string | null;
+  photo_path: string | null;
   created_at: string;
   resident: {
     first_name: string;
@@ -259,6 +261,11 @@ function ProblemsPage() {
                       >
                         {item.description}
                       </p>
+                      {item.photo_path && (
+                        <div className="mt-2">
+                          <ReportPhotoButton reportId={item.id} />
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell className="text-sm">{location(item) || "—"}</TableCell>
                     <TableCell>

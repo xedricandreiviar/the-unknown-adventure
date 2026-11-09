@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
-import { CalendarDays, FileText, LogOut, Bell, TriangleAlert } from "lucide-react";
+import { CalendarDays, LogOut, Bell, TriangleAlert } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { Reveal } from "@/components/reveal";
 import { StatusBadge } from "@/components/status-badge";
 import { getMyProfile, updateMyProfile } from "@/lib/profiles.functions";
 import { getMyRequests, cancelMyRequest } from "@/lib/queue.functions";
+import { MyRequestsTable } from "@/components/my-requests-table";
 import { getMyReservations, cancelMyReservation } from "@/lib/court.functions";
 import { getMyNotifications, markAllNotificationsRead } from "@/lib/notifications.functions";
 import { getMyProblemReports, getMyBenefitReleases } from "@/lib/problems.functions";
@@ -43,6 +44,7 @@ function AccountPage() {
   const reportsFn = useServerFn(getMyProblemReports);
   const releasesFn = useServerFn(getMyBenefitReleases);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [fields, setFields] = useState({ first_name: "", middle_name: "", last_name: "", street: "", purok: "", barangay: "Wawa", contact_number: "", senior_id_number: "", pwd_id_number: "", pwd_disability_type: "", is_senior: false, is_pwd: false });
   const [requests, setRequests] = useState<Array<{ id: string; code: string; status: string; created_at: string; rejection_reason: string | null; service: { name: string } | null }>>([]);
   const [reservations, setReservations] = useState<Array<{ id: string; res_date: string; slot: string; purpose: string; status: string }>>([]);
@@ -62,6 +64,7 @@ function AccountPage() {
         if (!result.profile) throw new Error("Your account profile could not be found.");
         const person = result.profile as Profile;
         setProfile(person);
+        setIsAdmin(result.isAdmin);
         setFields({ first_name: person.first_name, middle_name: person.middle_name, last_name: person.last_name, street: person.street, purok: person.purok, barangay: person.barangay, contact_number: person.contact_number, senior_id_number: person.senior_id_number ?? "", pwd_id_number: person.pwd_id_number ?? "", pwd_disability_type: person.pwd_disability_type ?? "", is_senior: person.is_senior, is_pwd: person.is_pwd });
         setRequests(requestRows); setReservations(reservationRows); setNotifications(notificationRows); setReports(reportRows); setReleases(releaseRows);
       })
@@ -118,7 +121,7 @@ function AccountPage() {
 
   return <div>
     <PageHero kicker="Resident account" title={`${profile.first_name} ${profile.last_name}`} body={profile.email}>
-      <div className="flex flex-wrap items-center gap-3"><StatusBadge status={profile.status} /><Button variant="outline" onClick={() => void signOut()}><LogOut className="mr-2 size-4" aria-hidden />Sign out</Button></div>
+      <div className="flex flex-wrap items-center gap-3"><StatusBadge status={profile.status} />{isAdmin && <Button asChild variant="gold"><Link to="/admin">Admin panel</Link></Button>}<Button variant="outline" onClick={() => void signOut()}><LogOut className="mr-2 size-4" aria-hidden />Sign out</Button></div>
     </PageHero>
     {error && <p role="alert" className="mx-auto max-w-6xl px-4 pt-5 text-sm text-destructive">{error}</p>}{message && <p role="status" className="mx-auto max-w-6xl px-4 pt-5 text-sm text-forest">{message}</p>}
     {profile.status !== "approved" && <div className="mx-auto max-w-6xl px-4 pt-6"><div className="flex gap-3 border-l-4 border-gold-deep bg-gold-soft/30 p-4 text-sm"><TriangleAlert className="size-5 shrink-0 text-gold-deep" aria-hidden /><div><p className="font-semibold">{profile.status === "pending" ? "Your account is awaiting barangay approval." : profile.status === "rejected" ? "Your account application was not approved." : "Your account is currently deactivated."}</p>{profile.rejection_reason && <p className="mt-1">{profile.rejection_reason}</p>}</div></div></div>}
@@ -133,7 +136,7 @@ function AccountPage() {
 
       <div className="space-y-8">
         <section><div className="flex items-center justify-between gap-3"><h2 className="flex items-center gap-2 font-display text-xl font-semibold text-forest-deep"><Bell className="size-5 text-gold-deep" aria-hidden />Notifications</h2>{notifications.some((item) => !item.read) && <Button size="sm" variant="outline" disabled={busy} onClick={() => void markRead()}>Mark all read</Button>}</div>{notifications.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">No notifications.</p> : <ul className="mt-3 divide-y divide-border">{notifications.slice(0, 6).map((item) => <li key={item.id} className={`py-3 ${item.read ? "opacity-70" : ""}`}><p className="font-medium">{item.title}{!item.read && <span className="ml-2 inline-block size-2 rounded-full bg-gold-deep" />}</p><p className="text-sm text-muted-foreground">{item.body}</p><time className="text-xs text-muted-foreground">{new Date(item.created_at).toLocaleDateString()}</time></li>)}</ul>}</section>
-        <section><h2 className="flex items-center gap-2 font-display text-xl font-semibold text-forest-deep"><FileText className="size-5 text-gold-deep" aria-hidden />My service requests</h2>{requests.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">No requests filed yet. <Link to="/services" className="text-gold-deep underline">Browse services</Link></p> : <ul className="mt-3 divide-y divide-border">{requests.map((item) => <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 py-3"><div><Link to="/track" search={{ code: item.code }} className="font-medium text-gold-deep underline">{item.code}</Link><p className="text-sm text-muted-foreground">{item.service?.name} · {new Date(item.created_at).toLocaleDateString()}</p>{item.rejection_reason && <p className="text-sm text-destructive">{item.rejection_reason}</p>}</div><div className="flex items-center gap-3"><StatusBadge status={item.status} />{item.status === "pending" && <Button variant="outline" size="sm" disabled={busy} onClick={() => void cancelRequest(item.id)}>Cancel</Button>}</div></li>)}</ul>}</section>
+        <MyRequestsTable requests={requests} busy={busy} onCancel={(id) => void cancelRequest(id)} />
         <section><h2 className="flex items-center gap-2 font-display text-xl font-semibold text-forest-deep"><CalendarDays className="size-5 text-gold-deep" aria-hidden />Court reservations</h2>{reservations.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">No reservations yet. <Link to="/court-booking" className="text-gold-deep underline">Check availability</Link></p> : <ul className="mt-3 divide-y divide-border">{reservations.map((item) => <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 py-3"><div><p className="font-medium">{item.res_date} · {BOOKING_SLOTS.find((slot) => slot.start === item.slot)?.label ?? item.slot}</p><p className="text-sm text-muted-foreground">{item.purpose}</p></div><div className="flex items-center gap-3"><StatusBadge status={item.status} />{item.status === "pending" && <Button variant="outline" size="sm" disabled={busy} onClick={() => void cancelReservation(item.id)}>Cancel</Button>}</div></li>)}</ul>}</section>
         <section><h2 className="font-display text-xl font-semibold text-forest-deep">Problem reports</h2>{reports.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">No reports submitted.</p> : <ul className="mt-3 divide-y divide-border">{reports.map((item) => <li key={item.id} className="py-3"><div className="flex items-center justify-between gap-2"><p className="font-medium">{item.category}</p><StatusBadge status={item.status} /></div><p className="text-sm text-muted-foreground">{item.description}</p>{item.admin_reply && <p className="mt-1 text-sm">Barangay reply: {item.admin_reply}</p>}</li>)}</ul>}</section>
         <section><h2 className="font-display text-xl font-semibold text-forest-deep">Senior and PWD benefit releases</h2>{releases.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">No benefit releases listed.</p> : <ul className="mt-3 divide-y divide-border">{releases.map((item) => <li key={item.id} className="flex items-center justify-between gap-3 py-3"><div><p className="font-medium">{item.kind.toUpperCase()} · {item.description}</p>{item.date_released && <p className="text-sm text-muted-foreground">Release date: {item.date_released}</p>}</div><StatusBadge status={item.status} /></li>)}</ul>}</section>

@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountRouteImport } from './routes/account'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AnnouncementsRouteImport } from './routes/announcements'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as ContactRouteImport } from './routes/contact'
@@ -18,9 +19,13 @@ import { Route as CourtBookingRouteImport } from './routes/court-booking'
 import { Route as OfficialsRouteImport } from './routes/officials'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as PwdRouteImport } from './routes/pwd'
+import { Route as RequestRouteImport } from './routes/request'
 import { Route as ServicesRouteImport } from './routes/services'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as TrackRouteImport } from './routes/track'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as AdminAccountsRouteImport } from './routes/admin.accounts'
+import { Route as AdminRequestsRouteImport } from './routes/admin.requests'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -30,6 +35,11 @@ const IndexRoute = IndexRouteImport.update({
 const AccountRoute = AccountRouteImport.update({
   id: '/account',
   path: '/account',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AnnouncementsRoute = AnnouncementsRouteImport.update({
@@ -67,6 +77,11 @@ const PwdRoute = PwdRouteImport.update({
   path: '/pwd',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RequestRoute = RequestRouteImport.update({
+  id: '/request',
+  path: '/request',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ServicesRoute = ServicesRouteImport.update({
   id: '/services',
   path: '/services',
@@ -82,10 +97,26 @@ const TrackRoute = TrackRouteImport.update({
   path: '/track',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAccountsRoute = AdminAccountsRouteImport.update({
+  id: '/accounts',
+  path: '/accounts',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminRequestsRoute = AdminRequestsRouteImport.update({
+  id: '/requests',
+  path: '/requests',
+  getParentRoute: () => AdminRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
+  '/admin': typeof AdminRouteWithChildren
   '/announcements': typeof AnnouncementsRoute
   '/auth': typeof AuthRoute
   '/contact': typeof ContactRoute
@@ -93,9 +124,13 @@ export interface FileRoutesByFullPath {
   '/officials': typeof OfficialsRoute
   '/privacy': typeof PrivacyRoute
   '/pwd': typeof PwdRoute
+  '/request': typeof RequestRoute
   '/services': typeof ServicesRoute
   '/terms': typeof TermsRoute
   '/track': typeof TrackRoute
+  '/admin/accounts': typeof AdminAccountsRoute
+  '/admin/requests': typeof AdminRequestsRoute
+  '/admin/': typeof AdminIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -107,14 +142,19 @@ export interface FileRoutesByTo {
   '/officials': typeof OfficialsRoute
   '/privacy': typeof PrivacyRoute
   '/pwd': typeof PwdRoute
+  '/request': typeof RequestRoute
   '/services': typeof ServicesRoute
   '/terms': typeof TermsRoute
   '/track': typeof TrackRoute
+  '/admin/accounts': typeof AdminAccountsRoute
+  '/admin/requests': typeof AdminRequestsRoute
+  '/admin': typeof AdminIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
+  '/admin': typeof AdminRouteWithChildren
   '/announcements': typeof AnnouncementsRoute
   '/auth': typeof AuthRoute
   '/contact': typeof ContactRoute
@@ -122,15 +162,20 @@ export interface FileRoutesById {
   '/officials': typeof OfficialsRoute
   '/privacy': typeof PrivacyRoute
   '/pwd': typeof PwdRoute
+  '/request': typeof RequestRoute
   '/services': typeof ServicesRoute
   '/terms': typeof TermsRoute
   '/track': typeof TrackRoute
+  '/admin/accounts': typeof AdminAccountsRoute
+  '/admin/requests': typeof AdminRequestsRoute
+  '/admin/': typeof AdminIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/account'
+    | '/admin'
     | '/announcements'
     | '/auth'
     | '/contact'
@@ -138,9 +183,13 @@ export interface FileRouteTypes {
     | '/officials'
     | '/privacy'
     | '/pwd'
+    | '/request'
     | '/services'
     | '/terms'
     | '/track'
+    | '/admin/accounts'
+    | '/admin/requests'
+    | '/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -152,13 +201,18 @@ export interface FileRouteTypes {
     | '/officials'
     | '/privacy'
     | '/pwd'
+    | '/request'
     | '/services'
     | '/terms'
     | '/track'
+    | '/admin/accounts'
+    | '/admin/requests'
+    | '/admin'
   id:
     | '__root__'
     | '/'
     | '/account'
+    | '/admin'
     | '/announcements'
     | '/auth'
     | '/contact'
@@ -166,14 +220,19 @@ export interface FileRouteTypes {
     | '/officials'
     | '/privacy'
     | '/pwd'
+    | '/request'
     | '/services'
     | '/terms'
     | '/track'
+    | '/admin/accounts'
+    | '/admin/requests'
+    | '/admin/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccountRoute: typeof AccountRoute
+  AdminRoute: typeof AdminRouteWithChildren
   AnnouncementsRoute: typeof AnnouncementsRoute
   AuthRoute: typeof AuthRoute
   ContactRoute: typeof ContactRoute
@@ -181,6 +240,7 @@ export interface RootRouteChildren {
   OfficialsRoute: typeof OfficialsRoute
   PrivacyRoute: typeof PrivacyRoute
   PwdRoute: typeof PwdRoute
+  RequestRoute: typeof RequestRoute
   ServicesRoute: typeof ServicesRoute
   TermsRoute: typeof TermsRoute
   TrackRoute: typeof TrackRoute
@@ -200,6 +260,13 @@ declare module '@tanstack/react-router' {
       path: '/account'
       fullPath: '/account'
       preLoaderRoute: typeof AccountRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/announcements': {
@@ -251,6 +318,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PwdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/request': {
+      id: '/request'
+      path: '/request'
+      fullPath: '/request'
+      preLoaderRoute: typeof RequestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/services': {
       id: '/services'
       path: '/services'
@@ -272,12 +346,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TrackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/accounts': {
+      id: '/admin/accounts'
+      path: '/accounts'
+      fullPath: '/admin/accounts'
+      preLoaderRoute: typeof AdminAccountsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/requests': {
+      id: '/admin/requests'
+      path: '/requests'
+      fullPath: '/admin/requests'
+      preLoaderRoute: typeof AdminRequestsRouteImport
+      parentRoute: typeof AdminRoute
+    }
   }
 }
+
+interface AdminRouteChildren {
+  AdminAccountsRoute: typeof AdminAccountsRoute
+  AdminRequestsRoute: typeof AdminRequestsRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminAccountsRoute: AdminAccountsRoute,
+  AdminRequestsRoute: AdminRequestsRoute,
+  AdminIndexRoute: AdminIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountRoute: AccountRoute,
+  AdminRoute: AdminRouteWithChildren,
   AnnouncementsRoute: AnnouncementsRoute,
   AuthRoute: AuthRoute,
   ContactRoute: ContactRoute,
@@ -285,6 +395,7 @@ const rootRouteChildren: RootRouteChildren = {
   OfficialsRoute: OfficialsRoute,
   PrivacyRoute: PrivacyRoute,
   PwdRoute: PwdRoute,
+  RequestRoute: RequestRoute,
   ServicesRoute: ServicesRoute,
   TermsRoute: TermsRoute,
   TrackRoute: TrackRoute,

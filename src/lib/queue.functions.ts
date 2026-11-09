@@ -1,6 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { requestSchema, dateString } from "@/lib/validation";
+import {
+  requestSchema,
+  dateString,
+  DETAILS_MIN_LENGTH,
+  DETAILS_REQUIRED_SERVICE_CODES,
+  REQUEST_PROFILE_FIELDS,
+} from "@/lib/validation";
 import { z } from "zod";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -33,13 +39,25 @@ export const submitRequest = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => requestSchema.parse(data))
   .handler(async ({ data, context }) => {
+    const { data: flag } = await context.supabase
+      .from("feature_flags")
+      .select("enabled")
+      .eq("key", "queueing")
+      .maybeSingle();
+    if (flag && !flag.enabled) {
+      throw new Error("Service requests are currently turned off by the barangay.");
+    }
+
     const { data: profile } = await context.supabase
       .from("profiles")
-      .select("status")
+      .select("status, first_name, last_name, street, purok, contact_number")
       .eq("id", context.userId)
       .single();
     if (profile?.status !== "approved") {
       throw new Error("Your account must be approved before filing a request.");
+    }
+    if (REQUEST_PROFILE_FIELDS.some((field) => !String(profile[field] ?? "").trim())) {
+      throw new Error("Complete your name, address, and contact number in My Account before filing a request.");
     }
 
     const { data: service } = await context.supabase
@@ -49,6 +67,9 @@ export const submitRequest = createServerFn({ method: "POST" })
       .single();
     if (!service) throw new Error("Choose a valid service.");
     if (!service.enabled) throw new Error("This service is currently unavailable.");
+    if (DETAILS_REQUIRED_SERVICE_CODES.includes(service.code) && data.details.length < DETAILS_MIN_LENGTH) {
+      throw new Error(`Describe the matter in at least ${DETAILS_MIN_LENGTH} characters.`);
+    }
 
     // no duplicate active entries for the same service
     const { data: dup } = await context.supabase
@@ -68,7 +89,12 @@ export const submitRequest = createServerFn({ method: "POST" })
     for (let attempt = 0; attempt < 3; attempt++) {
       const { data: inserted, error } = await context.supabase
         .from("service_requests")
-        .insert({ ...data, user_id: context.userId, code: makeCode(service.code) })
+        .insert({
+          service_id: data.service_id,
+          details: data.details,
+          user_id: context.userId,
+          code: makeCode(service.code),
+        })
         .select("code")
         .single();
       if (!error && inserted) return { code: inserted.code };
@@ -132,7 +158,9 @@ export const adminListRequests = createServerFn({ method: "GET" })
     await assertAdmin(context);
     let query = context.supabase
       .from("service_requests")
-      .select("*, service:services(name, fee, code)")
+      .select(
+        "*, service:services(name, fee, code), resident:profiles(first_name, middle_name, last_name, street, purok, barangay, contact_number, is_senior, is_pwd)",
+      )
       .order("created_at", { ascending: false });
     if (data.status) query = query.eq("status", data.status);
     if (data.from) query = query.gte("created_at", `${data.from}T00:00:00Z`);

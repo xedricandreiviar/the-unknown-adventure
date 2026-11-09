@@ -30,29 +30,60 @@ export const Route = createFileRoute("/admin/requests")({
 
 type RequestStatus = "pending" | "in_queue" | "processing" | "completed" | "rejected" | "cancelled";
 
-type ServiceRequest = {
-  id: string;
-  code: string;
-  status: RequestStatus;
+/** Who filed the request. This is read from the resident's profile, not copied onto the request. */
+type Resident = {
   first_name: string;
   middle_name: string;
   last_name: string;
   street: string;
   purok: string;
+  barangay: string;
   contact_number: string;
+  is_senior: boolean;
+  is_pwd: boolean;
+};
+
+type ServiceRequest = {
+  id: string;
+  code: string;
+  status: RequestStatus;
   details: string;
   rejection_reason: string | null;
   created_at: string;
   service: { name: string; fee: number | string | null; code: string } | null;
+  resident: Resident | null;
 };
 
-type View = "active" | "finished" | "all";
+type View = "active" | "completed" | "closed" | "all";
 
 const VIEWS: Array<{ key: View; label: string }> = [
   { key: "active", label: "Active" },
-  { key: "finished", label: "Finished" },
+  { key: "completed", label: "Completed" },
+  { key: "closed", label: "Rejected / Cancelled" },
   { key: "all", label: "All" },
 ];
+
+function viewOf(status: RequestStatus): Exclude<View, "all"> {
+  if (REQUEST_ACTIVE.includes(status)) return "active";
+  return status === "completed" ? "completed" : "closed";
+}
+
+function residentName(resident: Resident | null) {
+  if (!resident) return "Resident not found";
+  const name = [resident.first_name, resident.middle_name, resident.last_name]
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(" ");
+  return name || "No name on file";
+}
+
+function residentAddress(resident: Resident | null) {
+  if (!resident) return "";
+  return [resident.street, resident.purok]
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(", ");
+}
 
 /** The one forward step an admin can take from each status. */
 const NEXT_STEP: Partial<
@@ -100,8 +131,9 @@ function RequestsPage() {
 
   const counts = useMemo(
     () => ({
-      active: requests.filter((item) => REQUEST_ACTIVE.includes(item.status)).length,
-      finished: requests.filter((item) => !REQUEST_ACTIVE.includes(item.status)).length,
+      active: requests.filter((item) => viewOf(item.status) === "active").length,
+      completed: requests.filter((item) => viewOf(item.status) === "completed").length,
+      closed: requests.filter((item) => viewOf(item.status) === "closed").length,
       all: requests.length,
     }),
     [requests],
@@ -110,11 +142,9 @@ function RequestsPage() {
   const visible = useMemo(() => {
     const term = search.trim().toLowerCase();
     return requests.filter((item) => {
-      const isActive = REQUEST_ACTIVE.includes(item.status);
-      if (view === "active" && !isActive) return false;
-      if (view === "finished" && isActive) return false;
+      if (view !== "all" && viewOf(item.status) !== view) return false;
       if (!term) return true;
-      return `${item.code} ${item.first_name} ${item.last_name} ${item.service?.name ?? ""}`
+      return `${item.code} ${residentName(item.resident)} ${item.service?.name ?? ""}`
         .toLowerCase()
         .includes(term);
     });
@@ -219,11 +249,19 @@ function RequestsPage() {
                     </TableCell>
                     <TableCell>
                       <p className="font-medium">
-                        {item.first_name} {item.middle_name} {item.last_name}
+                        {residentName(item.resident)}
+                        {item.resident?.is_senior && (
+                          <span className="ml-2 text-xs font-normal text-gold-deep">Senior</span>
+                        )}
+                        {item.resident?.is_pwd && (
+                          <span className="ml-2 text-xs font-normal text-gold-deep">PWD</span>
+                        )}
                       </p>
-                      <p className="text-xs text-muted-foreground">{item.contact_number}</p>
                       <p className="text-xs text-muted-foreground">
-                        {item.street}, {item.purok}
+                        {item.resident?.contact_number}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {residentAddress(item.resident) || "No address on file"}
                       </p>
                     </TableCell>
                     <TableCell className="text-sm">
@@ -243,7 +281,7 @@ function RequestsPage() {
                     <TableCell>
                       <StatusBadge status={item.status} />
                       {item.status === "rejected" && item.rejection_reason && (
-                        <p className="mt-1 max-w-48 text-xs text-muted-foreground">
+                        <p className="mt-1 max-w-48 text-xs text-destructive">
                           {item.rejection_reason}
                         </p>
                       )}

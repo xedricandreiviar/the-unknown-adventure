@@ -19,6 +19,7 @@ import { Route as CourtBookingRouteImport } from './routes/court-booking'
 import { Route as OfficialsRouteImport } from './routes/officials'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as PwdRouteImport } from './routes/pwd'
+import { Route as RequestRouteImport } from './routes/request'
 import { Route as ServicesRouteImport } from './routes/services'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as TrackRouteImport } from './routes/track'
@@ -76,6 +77,11 @@ const PwdRoute = PwdRouteImport.update({
   path: '/pwd',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RequestRoute = RequestRouteImport.update({
+  id: '/request',
+  path: '/request',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ServicesRoute = ServicesRouteImport.update({
   id: '/services',
   path: '/services',
@@ -118,6 +124,7 @@ export interface FileRoutesByFullPath {
   '/officials': typeof OfficialsRoute
   '/privacy': typeof PrivacyRoute
   '/pwd': typeof PwdRoute
+  '/request': typeof RequestRoute
   '/services': typeof ServicesRoute
   '/terms': typeof TermsRoute
   '/track': typeof TrackRoute
@@ -135,6 +142,7 @@ export interface FileRoutesByTo {
   '/officials': typeof OfficialsRoute
   '/privacy': typeof PrivacyRoute
   '/pwd': typeof PwdRoute
+  '/request': typeof RequestRoute
   '/services': typeof ServicesRoute
   '/terms': typeof TermsRoute
   '/track': typeof TrackRoute
@@ -154,6 +162,7 @@ export interface FileRoutesById {
   '/officials': typeof OfficialsRoute
   '/privacy': typeof PrivacyRoute
   '/pwd': typeof PwdRoute
+  '/request': typeof RequestRoute
   '/services': typeof ServicesRoute
   '/terms': typeof TermsRoute
   '/track': typeof TrackRoute
@@ -174,6 +183,7 @@ export interface FileRouteTypes {
     | '/officials'
     | '/privacy'
     | '/pwd'
+    | '/request'
     | '/services'
     | '/terms'
     | '/track'
@@ -191,6 +201,7 @@ export interface FileRouteTypes {
     | '/officials'
     | '/privacy'
     | '/pwd'
+    | '/request'
     | '/services'
     | '/terms'
     | '/track'
@@ -209,6 +220,7 @@ export interface FileRouteTypes {
     | '/officials'
     | '/privacy'
     | '/pwd'
+    | '/request'
     | '/services'
     | '/terms'
     | '/track'
@@ -228,6 +240,7 @@ export interface RootRouteChildren {
   OfficialsRoute: typeof OfficialsRoute
   PrivacyRoute: typeof PrivacyRoute
   PwdRoute: typeof PwdRoute
+  RequestRoute: typeof RequestRoute
   ServicesRoute: typeof ServicesRoute
   TermsRoute: typeof TermsRoute
   TrackRoute: typeof TrackRoute
@@ -305,6 +318,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PwdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/request': {
+      id: '/request'
+      path: '/request'
+      fullPath: '/request'
+      preLoaderRoute: typeof RequestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/services': {
       id: '/services'
       path: '/services'
@@ -375,6 +395,7 @@ const rootRouteChildren: RootRouteChildren = {
   OfficialsRoute: OfficialsRoute,
   PrivacyRoute: PrivacyRoute,
   PwdRoute: PwdRoute,
+  RequestRoute: RequestRoute,
   ServicesRoute: ServicesRoute,
   TermsRoute: TermsRoute,
   TrackRoute: TrackRoute,

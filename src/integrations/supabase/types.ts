@@ -365,56 +365,35 @@ export type Database = {
       }
       service_requests: {
         Row: {
-          barangay: string
           code: string
-          contact_number: string
           created_at: string
           details: string
-          first_name: string
           id: string
-          last_name: string
-          middle_name: string
-          purok: string
           rejection_reason: string | null
           service_id: string
           status: Database["public"]["Enums"]["request_status"]
-          street: string
           updated_at: string
           user_id: string
         }
         Insert: {
-          barangay: string
           code: string
-          contact_number: string
           created_at?: string
           details?: string
-          first_name: string
           id?: string
-          last_name: string
-          middle_name?: string
-          purok: string
           rejection_reason?: string | null
           service_id: string
           status?: Database["public"]["Enums"]["request_status"]
-          street: string
           updated_at?: string
           user_id: string
         }
         Update: {
-          barangay?: string
           code?: string
-          contact_number?: string
           created_at?: string
           details?: string
-          first_name?: string
           id?: string
-          last_name?: string
-          middle_name?: string
-          purok?: string
           rejection_reason?: string | null
           service_id?: string
           status?: Database["public"]["Enums"]["request_status"]
-          street?: string
           updated_at?: string
           user_id?: string
         }

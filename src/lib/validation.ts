@@ -54,17 +54,27 @@ export const profileUpdateSchema = signupSchema.omit({ email: true, password: tr
 
 export type ProfileUpdateInput = z.input<typeof profileUpdateSchema>;
 
+/**
+ * A request only carries the service and the resident's notes. Who the resident is
+ * (name, address, contact number) is read from their profile, never copied onto the request.
+ */
 export const requestSchema = z.object({
   service_id: z.string().uuid("Choose a service."),
-  first_name: required("First name", 60),
-  middle_name: optionalText(60),
-  last_name: required("Last name", 60),
-  street: required("Street", 120),
-  purok: required("Purok / Zone", 60),
-  barangay: required("Barangay", 60),
-  contact_number: phoneSchema,
   details: optionalText(1000),
 });
+
+/** Services where the resident must describe the matter (complaints and incident reports). */
+export const DETAILS_REQUIRED_SERVICE_CODES: readonly string[] = ["CPB"];
+export const DETAILS_MIN_LENGTH = 10;
+
+/** Profile fields a resident must have filled in before they can file a request. */
+export const REQUEST_PROFILE_FIELDS = [
+  "first_name",
+  "last_name",
+  "street",
+  "purok",
+  "contact_number",
+] as const;
 
 export type RequestInput = z.input<typeof requestSchema>;
 

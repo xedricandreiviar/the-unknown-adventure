@@ -258,3 +258,33 @@
   background: color-mix(in oklab, var(--color-forest-soft) 30%, var(--color-card));
   border-color: var(--color-forest-soft);
 }
+
+/* Printing the admin report: show only the report, on plain paper. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #print-area,
+  #print-area * {
+    visibility: visible;
+  }
+  #print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 0;
+    color: #000;
+    background: #fff;
+  }
+  #print-area table {
+    page-break-inside: auto;
+  }
+  #print-area tr {
+    page-break-inside: avoid;
+  }
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+}

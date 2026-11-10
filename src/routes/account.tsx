@@ -14,7 +14,8 @@ import { getMyRequests, cancelMyRequest } from "@/lib/queue.functions";
 import { MyRequestsTable } from "@/components/my-requests-table";
 import { MyReportsTable } from "@/components/my-reports-table";
 import { getMyReservations, cancelMyReservation } from "@/lib/court.functions";
-import { getMyNotifications, markAllNotificationsRead } from "@/lib/notifications.functions";
+import { getMyNotifications, markAllNotificationsRead, markNotificationRead } from "@/lib/notifications.functions";
+import { NotificationDialog, NotificationRow, type NotificationItem } from "@/components/notifications-ui";
 import { getMyProblemReports, getMyBenefitReleases } from "@/lib/problems.functions";
 import { BOOKING_SLOTS, SITE } from "@/lib/site";
 
@@ -42,6 +43,7 @@ function AccountPage() {
   const cancelReservationFn = useServerFn(cancelMyReservation);
   const notificationsFn = useServerFn(getMyNotifications);
   const markAllReadFn = useServerFn(markAllNotificationsRead);
+  const markReadFn = useServerFn(markNotificationRead);
   const reportsFn = useServerFn(getMyProblemReports);
   const releasesFn = useServerFn(getMyBenefitReleases);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -49,7 +51,9 @@ function AccountPage() {
   const [fields, setFields] = useState({ first_name: "", middle_name: "", last_name: "", street: "", purok: "", barangay: "Wawa", contact_number: "", senior_id_number: "", pwd_id_number: "", pwd_disability_type: "", is_senior: false, is_pwd: false });
   const [requests, setRequests] = useState<Array<{ id: string; code: string; status: string; created_at: string; rejection_reason: string | null; service: { name: string } | null }>>([]);
   const [reservations, setReservations] = useState<Array<{ id: string; res_date: string; slot: string; purpose: string; status: string }>>([]);
-  const [notifications, setNotifications] = useState<Array<{ id: string; title: string; body: string; created_at: string; read: boolean }>>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [openNotification, setOpenNotification] = useState<NotificationItem | null>(null);
+  const [showAllNotifications, setShowAllNotifications] = useState(false);
   const [reports, setReports] = useState<Array<{ id: string; category: string; description: string; status: string; created_at: string; admin_reply: string | null }>>([]);
   const [releases, setReleases] = useState<Array<{ id: string; kind: string; description: string; status: string; date_released: string | null }>>([]);
   const [busy, setBusy] = useState(false);
@@ -98,6 +102,14 @@ function AccountPage() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not upload the document."); }
     finally { setBusy(false); }
   };
+  const openOne = (item: NotificationItem) => {
+    setOpenNotification({ ...item, read: true });
+    if (item.read) return;
+    setNotifications((rows) => rows.map((row) => (row.id === item.id ? { ...row, read: true } : row)));
+    void markReadFn({ data: { id: item.id } }).catch(() => {
+      setNotifications((rows) => rows.map((row) => (row.id === item.id ? { ...row, read: false } : row)));
+    });
+  };
   const markRead = async () => {
     setBusy(true); setError("");
     try { await markAllReadFn(); setNotifications((rows) => rows.map((item) => ({ ...item, read: true }))); }
@@ -136,7 +148,7 @@ function AccountPage() {
       <div className="mt-5 space-y-2 border-t border-border pt-4"><Label htmlFor="account-document">Supporting ID document</Label><Input id="account-document" type="file" accept="image/*,.pdf" onChange={(event) => void uploadDocument(event.target.files?.[0])} disabled={busy} /><p className="text-xs text-muted-foreground">{profile.document_path ? "A supporting document is on file. Upload a new one to replace it." : "Upload a photo or PDF for account review."}</p></div></div>
 
       <div className="space-y-8">
-        <section><div className="flex items-center justify-between gap-3"><h2 className="flex items-center gap-2 font-display text-xl font-semibold text-forest-deep"><Bell className="size-5 text-gold-deep" aria-hidden />Notifications</h2>{notifications.some((item) => !item.read) && <Button size="sm" variant="outline" disabled={busy} onClick={() => void markRead()}>Mark all read</Button>}</div>{notifications.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">No notifications.</p> : <ul className="mt-3 divide-y divide-border">{notifications.slice(0, 6).map((item) => <li key={item.id} className={`py-3 ${item.read ? "opacity-70" : ""}`}><p className="font-medium">{item.title}{!item.read && <span className="ml-2 inline-block size-2 rounded-full bg-gold-deep" />}</p><p className="text-sm text-muted-foreground">{item.body}</p><time className="text-xs text-muted-foreground">{new Date(item.created_at).toLocaleDateString()}</time></li>)}</ul>}</section>
+        <section><div className="flex items-center justify-between gap-3"><h2 className="flex items-center gap-2 font-display text-xl font-semibold text-forest-deep"><Bell className="size-5 text-gold-deep" aria-hidden />Notifications{notifications.some((item) => !item.read) && <span className="rounded-full bg-destructive px-2 text-xs font-semibold leading-5 text-white">{notifications.filter((item) => !item.read).length}</span>}</h2>{notifications.some((item) => !item.read) && <Button size="sm" variant="outline" disabled={busy} onClick={() => void markRead()}>Mark all read</Button>}</div>{notifications.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">No notifications.</p> : <><ul className="mt-3 divide-y divide-border border border-border">{(showAllNotifications ? notifications : notifications.slice(0, 6)).map((item) => <NotificationRow key={item.id} item={item} onOpen={openOne} />)}</ul>{notifications.length > 6 && <Button size="sm" variant="ghost" className="mt-2" onClick={() => setShowAllNotifications((value) => !value)}>{showAllNotifications ? "Show fewer" : `Show all (${notifications.length})`}</Button>}</>}<NotificationDialog item={openNotification} onClose={() => setOpenNotification(null)} /></section>
         <MyRequestsTable requests={requests} busy={busy} onCancel={(id) => void cancelRequest(id)} />
         <section><h2 className="flex items-center gap-2 font-display text-xl font-semibold text-forest-deep"><CalendarDays className="size-5 text-gold-deep" aria-hidden />Court reservations</h2>{reservations.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">No reservations yet. <Link to="/court-booking" className="text-gold-deep underline">Check availability</Link></p> : <ul className="mt-3 divide-y divide-border">{reservations.map((item) => <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 py-3"><div><p className="font-medium">{item.res_date} · {BOOKING_SLOTS.find((slot) => slot.start === item.slot)?.label ?? item.slot}</p><p className="text-sm text-muted-foreground">{item.purpose}</p></div><div className="flex items-center gap-3"><StatusBadge status={item.status} />{item.status === "pending" && <Button variant="outline" size="sm" disabled={busy} onClick={() => void cancelReservation(item.id)}>Cancel</Button>}</div></li>)}</ul>}</section>
         <MyReportsTable reports={reports} />

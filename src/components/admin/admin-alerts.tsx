@@ -1,31 +1,50 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { adminGetAlerts, type AlertItem } from "@/lib/admin-reports.functions";
+import {
+  NotificationDialog,
+  NotificationRow,
+  type NotificationItem,
+} from "@/components/notifications-ui";
+import { adminGetAlerts } from "@/lib/admin-reports.functions";
+import {
+  getMyNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+} from "@/lib/notifications.functions";
 
-export type AlertState = {
-  counts: { accounts: number; requests: number; problems: number };
-  items: AlertItem[];
-};
+export type AlertCounts = { accounts: number; requests: number; problems: number };
 
-const EMPTY: AlertState = { counts: { accounts: 0, requests: 0, problems: 0 }, items: [] };
+const EMPTY: AlertCounts = { accounts: 0, requests: 0, problems: 0 };
 const REFRESH_MS = 30_000;
 
-/** Polls for new accounts, requests and reports so the admin sees them without reloading. */
+/**
+ * Keeps two things fresh for the admin panel:
+ * - the counts of work still waiting (red badges on the tabs), and
+ * - the admin's own notifications, which can be opened and marked as read.
+ */
 export function useAdminAlerts() {
   const alertsFn = useServerFn(adminGetAlerts);
-  const [alerts, setAlerts] = useState<AlertState>(EMPTY);
+  const listFn = useServerFn(getMyNotifications);
+  const readFn = useServerFn(markNotificationRead);
+  const readAllFn = useServerFn(markAllNotificationsRead);
+  const [counts, setCounts] = useState<AlertCounts>(EMPTY);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
 
   const refresh = useCallback(async () => {
     try {
-      setAlerts((await alertsFn()) as AlertState);
+      setCounts((await alertsFn()).counts);
     } catch {
-      // Keep showing the last known counts if one refresh fails.
+      // Keep the last known counts if one refresh fails.
     }
-  }, [alertsFn]);
+    try {
+      setNotifications((await listFn()) as NotificationItem[]);
+    } catch {
+      // Same for notifications.
+    }
+  }, [alertsFn, listFn]);
 
   useEffect(() => {
     void refresh();
@@ -38,16 +57,31 @@ export function useAdminAlerts() {
     };
   }, [refresh]);
 
-  return { alerts, refresh };
-}
+  const markRead = useCallback(
+    (item: NotificationItem) => {
+      if (item.read) return;
+      setNotifications((rows) =>
+        rows.map((row) => (row.id === item.id ? { ...row, read: true } : row)),
+      );
+      void readFn({ data: { id: item.id } }).catch(() => {
+        setNotifications((rows) =>
+          rows.map((row) => (row.id === item.id ? { ...row, read: false } : row)),
+        );
+      });
+    },
+    [readFn],
+  );
 
-function ago(iso: string) {
-  const minutes = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes} min ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} hr ago`;
-  return new Date(iso).toLocaleDateString();
+  const markAllRead = useCallback(async () => {
+    setNotifications((rows) => rows.map((row) => ({ ...row, read: true })));
+    try {
+      await readAllFn();
+    } catch {
+      void refresh();
+    }
+  }, [readAllFn, refresh]);
+
+  return { counts, notifications, markRead, markAllRead };
 }
 
 export function CountBadge({ count }: { count: number }) {
@@ -59,49 +93,61 @@ export function CountBadge({ count }: { count: number }) {
   );
 }
 
-export function AlertBell({ alerts }: { alerts: AlertState }) {
-  const total = alerts.counts.accounts + alerts.counts.requests + alerts.counts.problems;
+export function AlertBell({
+  notifications,
+  onRead,
+  onReadAll,
+}: {
+  notifications: NotificationItem[];
+  onRead: (item: NotificationItem) => void;
+  onReadAll: () => void;
+}) {
   const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState<NotificationItem | null>(null);
+  const unread = notifications.filter((item) => !item.read).length;
+
+  const openOne = (item: NotificationItem) => {
+    setOpen(false);
+    setSelected({ ...item, read: true });
+    onRead(item);
+  };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" aria-label={`Alerts, ${total} waiting`}>
-          <Bell className="size-4" aria-hidden />
-          <span className="hidden sm:inline">Alerts</span>
-          <CountBadge count={total} />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 p-0">
-        <div className="border-b border-border px-4 py-3">
-          <p className="text-sm font-semibold text-forest-deep">Waiting for you</p>
-          <p className="text-xs text-muted-foreground">
-            {alerts.counts.accounts} accounts · {alerts.counts.requests} requests ·{" "}
-            {alerts.counts.problems} reports
-          </p>
-        </div>
-        {alerts.items.length === 0 ? (
-          <p className="px-4 py-6 text-sm text-muted-foreground">
-            Nothing new. You are all caught up.
-          </p>
-        ) : (
-          <ul className="max-h-80 divide-y divide-border overflow-y-auto">
-            {alerts.items.map((item) => (
-              <li key={`${item.kind}-${item.id}`}>
-                <Link
-                  to={item.to}
-                  onClick={() => setOpen(false)}
-                  className="block px-4 py-3 hover:bg-secondary"
-                >
-                  <p className="text-sm font-medium">{item.title}</p>
-                  <p className="truncate text-xs text-muted-foreground">{item.detail}</p>
-                  <p className="mt-0.5 text-xs text-gold-deep">{ago(item.created_at)}</p>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </PopoverContent>
-    </Popover>
+    <>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button variant="outline" size="sm" aria-label={`Alerts, ${unread} unread`}>
+            <Bell className="size-4" aria-hidden />
+            <span className="hidden sm:inline">Alerts</span>
+            <CountBadge count={unread} />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-80 p-0">
+          <div className="flex items-center justify-between border-b border-border px-4 py-3">
+            <div>
+              <p className="text-sm font-semibold text-forest-deep">Alerts</p>
+              <p className="text-xs text-muted-foreground">{unread} unread</p>
+            </div>
+            {unread > 0 && (
+              <Button size="sm" variant="ghost" onClick={onReadAll}>
+                Mark all read
+              </Button>
+            )}
+          </div>
+          {notifications.length === 0 ? (
+            <p className="px-4 py-6 text-sm text-muted-foreground">
+              Nothing new. You are all caught up.
+            </p>
+          ) : (
+            <ul className="max-h-96 divide-y divide-border overflow-y-auto">
+              {notifications.slice(0, 20).map((item) => (
+                <NotificationRow key={item.id} item={item} onOpen={openOne} />
+              ))}
+            </ul>
+          )}
+        </PopoverContent>
+      </Popover>
+      <NotificationDialog item={selected} onClose={() => setSelected(null)} />
+    </>
   );
 }

@@ -9,7 +9,7 @@ async function assertAdmin(context: Context) {
   if (!data) throw new Error("Admin access required.");
 }
 
-export type AlertItem = {
+type AlertItem = {
   kind: "account" | "request" | "problem";
   id: string;
   title: string;

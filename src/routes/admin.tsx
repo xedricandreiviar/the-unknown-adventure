@@ -89,7 +89,7 @@ function AdminLayout() {
 }
 
 function AdminShell({ userId }: { userId: string }) {
-  const { alerts } = useAdminAlerts();
+  const { counts, notifications, markRead, markAllRead } = useAdminAlerts();
   return (
     <AdminContext.Provider value={{ userId }}>
       <PageHero
@@ -102,7 +102,7 @@ function AdminShell({ userId }: { userId: string }) {
           <nav aria-label="Admin sections" className="flex gap-1 overflow-x-auto">
             {SECTIONS.map((section) => {
               const key = section.to.replace("/admin/", "");
-              const count = key in alerts.counts ? alerts.counts[key as SectionKey] : 0;
+              const count = key in counts ? counts[key as SectionKey] : 0;
               return (
                 <Link
                   key={section.to}
@@ -116,7 +116,7 @@ function AdminShell({ userId }: { userId: string }) {
               );
             })}
           </nav>
-          <AlertBell alerts={alerts} />
+          <AlertBell notifications={notifications} onRead={markRead} onReadAll={() => void markAllRead()} />
         </div>
       </div>
       <div className="mx-auto max-w-6xl px-4 py-8">

@@ -19,6 +19,7 @@ const SECTIONS = [
   { to: "/admin/accounts", label: "Accounts" },
   { to: "/admin/requests", label: "Requests" },
   { to: "/admin/problems", label: "Problems" },
+  { to: "/admin/registry", label: "PWD / Senior" },
   { to: "/admin/reports", label: "Reports" },
 ] as const;
 
@@ -100,8 +101,8 @@ function AdminShell({ userId }: { userId: string }) {
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4">
           <nav aria-label="Admin sections" className="flex gap-1 overflow-x-auto">
             {SECTIONS.map((section) => {
-              const key = section.to.replace("/admin/", "") as SectionKey | "reports";
-              const count = key === "reports" ? 0 : alerts.counts[key];
+              const key = section.to.replace("/admin/", "");
+              const count = key in alerts.counts ? alerts.counts[key as SectionKey] : 0;
               return (
                 <Link
                   key={section.to}

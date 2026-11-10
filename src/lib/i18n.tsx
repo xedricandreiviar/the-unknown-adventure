@@ -8,6 +8,8 @@ const DICT: Record<string, { en: string; fil: string }> = {
   "nav.services": { en: "Services", fil: "Mga Serbisyo" },
   "nav.pwd": { en: "PWD", fil: "PWD" },
   "nav.court": { en: "Court Booking", fil: "Reserba ng Korte" },
+  "nav.registry": { en: "PWD & Senior Registry", fil: "Rehistro ng PWD at Senior" },
+  "nav.track": { en: "Track Incentives", fil: "Subaybayan ang Insentibo" },
   "nav.announcements": { en: "Announcements", fil: "Mga Anunsyo" },
   "nav.officials": { en: "Officials", fil: "Mga Opisyal" },
   "nav.contact": { en: "Contact", fil: "Ugnayan" },

@@ -1,8 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useEffect, useState } from "react";
 import { CalendarDays, Megaphone } from "lucide-react";
 import { FeatureGate } from "@/components/feature-gate";
 import { PageHero } from "@/components/page-hero";
 import { Reveal } from "@/components/reveal";
+import { getAnnouncements } from "@/lib/settings.functions";
 import { SITE } from "@/lib/site";
 import announcementsHero from "@/assets/announcements-hero.jpg";
 
@@ -10,9 +13,16 @@ export const Route = createFileRoute("/announcements")({
   head: () => ({
     meta: [
       { title: `Announcements — ${SITE.name}` },
-      { name: "description", content: "Official announcements, advisories, and event notices from Barangay Wawa, Taguig City." },
+      {
+        name: "description",
+        content:
+          "Official announcements, advisories, and event notices from Barangay Wawa, Taguig City.",
+      },
       { property: "og:title", content: `Announcements — ${SITE.name}` },
-      { property: "og:description", content: "Advisories and event notices from Barangay Wawa, Taguig City." },
+      {
+        property: "og:description",
+        content: "Advisories and event notices from Barangay Wawa, Taguig City.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -20,51 +30,57 @@ export const Route = createFileRoute("/announcements")({
   component: AnnouncementsGate,
 });
 
-/** Temporary placeholder announcements — replace with real data when available */
-const ANNOUNCEMENTS = [
-  {
-    id: 1,
-    tag: "General",
-    title: "Welcome to the new Barangay Wawa site",
-    date: "Posted by the Barangay Wawa team",
-    body: "This site brings our services online: request barangay documents, find PWD guides, and reserve the multi-purpose court. More announcements will be posted here as events come up — check back soon.",
-    featured: true,
-  },
-  {
-    id: 2,
-    tag: "Health",
-    title: "Free medical check-up schedule",
-    date: "Barangay Health Center",
-    body: "The barangay health station will be conducting free medical check-ups for senior citizens and PWDs. Please bring your barangay ID and any existing medical records.",
-    featured: false,
-  },
-  {
-    id: 3,
-    tag: "Advisory",
-    title: "Court booking now available online",
-    date: "Barangay Wawa team",
-    body: "Residents may now reserve the multi-purpose court online in two-hour slots. Walk-in bookings remain available at the barangay hall during office hours.",
-    featured: false,
-  },
-  {
-    id: 4,
-    tag: "Events",
-    title: "Community clean-up drive",
-    date: "Environment Committee",
-    body: "Join us for a barangay-wide clean-up drive. All residents are encouraged to participate. Garbage bags and gloves will be provided at the barangay hall.",
-    featured: false,
-  },
-];
-
-const TAG_COLORS: Record<string, string> = {
-  General:  "bg-forest-deep/8 text-forest-deep",
-  Health:   "bg-gold-soft/40 text-gold-deep",
-  Advisory: "bg-secondary text-forest",
-  Events:   "bg-forest-deep/8 text-forest-deep",
+type Post = {
+  id: string;
+  title: string;
+  body: string;
+  category: string;
+  published_at: string | null;
+  created_at: string;
 };
 
+const TAG_COLORS: Record<string, string> = {
+  Notices: "bg-forest-deep/8 text-forest-deep",
+  Health: "bg-gold-soft/40 text-gold-deep",
+  Advisories: "bg-secondary text-forest",
+  Events: "bg-forest-deep/8 text-forest-deep",
+  Programs: "bg-gold-soft/40 text-gold-deep",
+};
+const DEFAULT_TAG = "bg-secondary text-forest";
+
+function postedOn(post: Post) {
+  return new Date(post.published_at ?? post.created_at).toLocaleDateString("en-PH", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
 function AnnouncementsPage() {
-  const featured = ANNOUNCEMENTS.find((a) => a.featured);
+  const listFn = useServerFn(getAnnouncements);
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    listFn()
+      .then((rows) => {
+        if (active) setPosts(rows as Post[]);
+      })
+      .catch(() => {
+        if (active) setFailed(true);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [listFn]);
+
+  const featured = posts[0];
+  const others = posts.slice(1);
 
   return (
     <div>
@@ -77,7 +93,23 @@ function AnnouncementsPage() {
         large
       />
 
-      {/* ── Featured announcement ── */}
+      {loading && (
+        <p className="mx-auto max-w-6xl px-6 py-20 text-sm text-muted-foreground">
+          Loading announcements…
+        </p>
+      )}
+      {failed && (
+        <p role="alert" className="mx-auto max-w-6xl px-6 py-20 text-sm text-destructive">
+          Announcements are temporarily unavailable. Please try again later.
+        </p>
+      )}
+      {!loading && !failed && posts.length === 0 && (
+        <p className="mx-auto max-w-6xl px-6 py-20 text-sm text-muted-foreground">
+          No announcements yet. Check back soon.
+        </p>
+      )}
+
+      {/* ── Featured announcement: the newest one ── */}
       {featured && (
         <Reveal as="section" className="mx-auto max-w-6xl px-6 py-20" direction="up">
           <div className="mb-10">
@@ -95,25 +127,56 @@ function AnnouncementsPage() {
             style={{ boxShadow: "0 4px 24px oklch(0.235 0.055 155 / 0.07)" }}
           >
             <span
-              className={`inline-block rounded-full px-3 py-1 text-xs font-semibold ${TAG_COLORS[featured.tag] ?? TAG_COLORS["General"]}`}
+              className={`inline-block rounded-full px-3 py-1 text-xs font-semibold ${TAG_COLORS[featured.category] ?? DEFAULT_TAG}`}
             >
-              {featured.tag}
+              {featured.category}
             </span>
             <h3 className="mt-4 font-display text-2xl font-semibold text-forest-deep">
               {featured.title}
             </h3>
             <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
               <CalendarDays className="size-3.5" aria-hidden />
-              {featured.date}
+              {postedOn(featured)}
             </p>
-            <p className="mt-4 text-lg leading-relaxed text-muted-foreground">
+            <p className="mt-4 whitespace-pre-line text-lg leading-relaxed text-muted-foreground">
               {featured.body}
             </p>
           </div>
         </Reveal>
       )}
 
-      {/* more announcements will be added here */}
+      {/* ── Earlier announcements ── */}
+      {others.length > 0 && (
+        <Reveal as="section" className="mx-auto max-w-6xl px-6 pb-20" direction="up">
+          <h2 className="font-display text-2xl font-semibold text-forest-deep">
+            Earlier announcements
+          </h2>
+          <div className="mt-6 grid gap-6 md:grid-cols-2">
+            {others.map((post) => (
+              <article
+                key={post.id}
+                className="card-lift rounded-2xl border border-border bg-card p-7"
+              >
+                <span
+                  className={`inline-block rounded-full px-3 py-1 text-xs font-semibold ${TAG_COLORS[post.category] ?? DEFAULT_TAG}`}
+                >
+                  {post.category}
+                </span>
+                <h3 className="mt-3 font-display text-xl font-semibold text-forest-deep">
+                  {post.title}
+                </h3>
+                <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <CalendarDays className="size-3.5" aria-hidden />
+                  {postedOn(post)}
+                </p>
+                <p className="mt-3 whitespace-pre-line leading-relaxed text-muted-foreground">
+                  {post.body}
+                </p>
+              </article>
+            ))}
+          </div>
+        </Reveal>
+      )}
     </div>
   );
 }

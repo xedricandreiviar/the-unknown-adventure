@@ -19,12 +19,18 @@ import { Route as CourtBookingRouteImport } from './routes/court-booking'
 import { Route as OfficialsRouteImport } from './routes/officials'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as PwdRouteImport } from './routes/pwd'
+import { Route as RegistryRouteImport } from './routes/registry'
+import { Route as ReportRouteImport } from './routes/report'
 import { Route as RequestRouteImport } from './routes/request'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as ServicesRouteImport } from './routes/services'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as TrackRouteImport } from './routes/track'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminAccountsRouteImport } from './routes/admin.accounts'
+import { Route as AdminProblemsRouteImport } from './routes/admin.problems'
+import { Route as AdminRegistryRouteImport } from './routes/admin.registry'
+import { Route as AdminReportsRouteImport } from './routes/admin.reports'
 import { Route as AdminRequestsRouteImport } from './routes/admin.requests'
 
 const IndexRoute = IndexRouteImport.update({
@@ -77,9 +83,24 @@ const PwdRoute = PwdRouteImport.update({
   path: '/pwd',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RegistryRoute = RegistryRouteImport.update({
+  id: '/registry',
+  path: '/registry',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportRoute = ReportRouteImport.update({
+  id: '/report',
+  path: '/report',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RequestRoute = RequestRouteImport.update({
   id: '/request',
   path: '/request',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ServicesRoute = ServicesRouteImport.update({
@@ -107,6 +128,21 @@ const AdminAccountsRoute = AdminAccountsRouteImport.update({
   path: '/accounts',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminProblemsRoute = AdminProblemsRouteImport.update({
+  id: '/problems',
+  path: '/problems',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminRegistryRoute = AdminRegistryRouteImport.update({
+  id: '/registry',
+  path: '/registry',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminReportsRoute = AdminReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminRequestsRoute = AdminRequestsRouteImport.update({
   id: '/requests',
   path: '/requests',
@@ -124,11 +160,17 @@ export interface FileRoutesByFullPath {
   '/officials': typeof OfficialsRoute
   '/privacy': typeof PrivacyRoute
   '/pwd': typeof PwdRoute
+  '/registry': typeof RegistryRoute
+  '/report': typeof ReportRoute
   '/request': typeof RequestRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/services': typeof ServicesRoute
   '/terms': typeof TermsRoute
   '/track': typeof TrackRoute
   '/admin/accounts': typeof AdminAccountsRoute
+  '/admin/problems': typeof AdminProblemsRoute
+  '/admin/registry': typeof AdminRegistryRoute
+  '/admin/reports': typeof AdminReportsRoute
   '/admin/requests': typeof AdminRequestsRoute
   '/admin/': typeof AdminIndexRoute
 }
@@ -142,11 +184,17 @@ export interface FileRoutesByTo {
   '/officials': typeof OfficialsRoute
   '/privacy': typeof PrivacyRoute
   '/pwd': typeof PwdRoute
+  '/registry': typeof RegistryRoute
+  '/report': typeof ReportRoute
   '/request': typeof RequestRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/services': typeof ServicesRoute
   '/terms': typeof TermsRoute
   '/track': typeof TrackRoute
   '/admin/accounts': typeof AdminAccountsRoute
+  '/admin/problems': typeof AdminProblemsRoute
+  '/admin/registry': typeof AdminRegistryRoute
+  '/admin/reports': typeof AdminReportsRoute
   '/admin/requests': typeof AdminRequestsRoute
   '/admin': typeof AdminIndexRoute
 }
@@ -162,11 +210,17 @@ export interface FileRoutesById {
   '/officials': typeof OfficialsRoute
   '/privacy': typeof PrivacyRoute
   '/pwd': typeof PwdRoute
+  '/registry': typeof RegistryRoute
+  '/report': typeof ReportRoute
   '/request': typeof RequestRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/services': typeof ServicesRoute
   '/terms': typeof TermsRoute
   '/track': typeof TrackRoute
   '/admin/accounts': typeof AdminAccountsRoute
+  '/admin/problems': typeof AdminProblemsRoute
+  '/admin/registry': typeof AdminRegistryRoute
+  '/admin/reports': typeof AdminReportsRoute
   '/admin/requests': typeof AdminRequestsRoute
   '/admin/': typeof AdminIndexRoute
 }
@@ -183,11 +237,17 @@ export interface FileRouteTypes {
     | '/officials'
     | '/privacy'
     | '/pwd'
+    | '/registry'
+    | '/report'
     | '/request'
+    | '/reset-password'
     | '/services'
     | '/terms'
     | '/track'
     | '/admin/accounts'
+    | '/admin/problems'
+    | '/admin/registry'
+    | '/admin/reports'
     | '/admin/requests'
     | '/admin/'
   fileRoutesByTo: FileRoutesByTo
@@ -201,11 +261,17 @@ export interface FileRouteTypes {
     | '/officials'
     | '/privacy'
     | '/pwd'
+    | '/registry'
+    | '/report'
     | '/request'
+    | '/reset-password'
     | '/services'
     | '/terms'
     | '/track'
     | '/admin/accounts'
+    | '/admin/problems'
+    | '/admin/registry'
+    | '/admin/reports'
     | '/admin/requests'
     | '/admin'
   id:
@@ -220,11 +286,17 @@ export interface FileRouteTypes {
     | '/officials'
     | '/privacy'
     | '/pwd'
+    | '/registry'
+    | '/report'
     | '/request'
+    | '/reset-password'
     | '/services'
     | '/terms'
     | '/track'
     | '/admin/accounts'
+    | '/admin/problems'
+    | '/admin/registry'
+    | '/admin/reports'
     | '/admin/requests'
     | '/admin/'
   fileRoutesById: FileRoutesById
@@ -240,7 +312,10 @@ export interface RootRouteChildren {
   OfficialsRoute: typeof OfficialsRoute
   PrivacyRoute: typeof PrivacyRoute
   PwdRoute: typeof PwdRoute
+  RegistryRoute: typeof RegistryRoute
+  ReportRoute: typeof ReportRoute
   RequestRoute: typeof RequestRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   ServicesRoute: typeof ServicesRoute
   TermsRoute: typeof TermsRoute
   TrackRoute: typeof TrackRoute
@@ -318,11 +393,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PwdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/registry': {
+      id: '/registry'
+      path: '/registry'
+      fullPath: '/registry'
+      preLoaderRoute: typeof RegistryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/report': {
+      id: '/report'
+      path: '/report'
+      fullPath: '/report'
+      preLoaderRoute: typeof ReportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/request': {
       id: '/request'
       path: '/request'
       fullPath: '/request'
       preLoaderRoute: typeof RequestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/services': {
@@ -360,6 +456,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAccountsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/problems': {
+      id: '/admin/problems'
+      path: '/problems'
+      fullPath: '/admin/problems'
+      preLoaderRoute: typeof AdminProblemsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/registry': {
+      id: '/admin/registry'
+      path: '/registry'
+      fullPath: '/admin/registry'
+      preLoaderRoute: typeof AdminRegistryRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/reports': {
+      id: '/admin/reports'
+      path: '/reports'
+      fullPath: '/admin/reports'
+      preLoaderRoute: typeof AdminReportsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/requests': {
       id: '/admin/requests'
       path: '/requests'
@@ -372,12 +489,18 @@ declare module '@tanstack/react-router' {
 
 interface AdminRouteChildren {
   AdminAccountsRoute: typeof AdminAccountsRoute
+  AdminProblemsRoute: typeof AdminProblemsRoute
+  AdminRegistryRoute: typeof AdminRegistryRoute
+  AdminReportsRoute: typeof AdminReportsRoute
   AdminRequestsRoute: typeof AdminRequestsRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminAccountsRoute: AdminAccountsRoute,
+  AdminProblemsRoute: AdminProblemsRoute,
+  AdminRegistryRoute: AdminRegistryRoute,
+  AdminReportsRoute: AdminReportsRoute,
   AdminRequestsRoute: AdminRequestsRoute,
   AdminIndexRoute: AdminIndexRoute,
 }
@@ -395,7 +518,10 @@ const rootRouteChildren: RootRouteChildren = {
   OfficialsRoute: OfficialsRoute,
   PrivacyRoute: PrivacyRoute,
   PwdRoute: PwdRoute,
+  RegistryRoute: RegistryRoute,
+  ReportRoute: ReportRoute,
   RequestRoute: RequestRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   ServicesRoute: ServicesRoute,
   TermsRoute: TermsRoute,
   TrackRoute: TrackRoute,

@@ -25,6 +25,7 @@ export const STATUS_META: Record<string, Meta> = {
   // problems
   submitted: { label: "Submitted", className: "bg-gold-soft text-forest-deep border-gold-deep/40", group: "active" },
   under_review: { label: "Under Review", className: "bg-secondary text-forest", group: "active" },
+  in_progress: { label: "In Progress", className: "bg-secondary text-forest", group: "active" },
   resolved: { label: "Resolved", className: "bg-forest text-primary-foreground", group: "finished" },
 };
 

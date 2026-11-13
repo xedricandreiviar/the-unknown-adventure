@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { PageHero } from "@/components/page-hero";
 import { Button } from "@/components/ui/button";
 import { AdminContext } from "@/components/admin/admin-context";
+import { AlertBell, CountBadge, useAdminAlerts } from "@/components/admin/admin-alerts";
 import { getMyProfile } from "@/lib/profiles.functions";
 import { SITE } from "@/lib/site";
 
@@ -17,7 +18,12 @@ export const Route = createFileRoute("/admin")({
 const SECTIONS = [
   { to: "/admin/accounts", label: "Accounts" },
   { to: "/admin/requests", label: "Requests" },
+  { to: "/admin/problems", label: "Problems" },
+  { to: "/admin/registry", label: "PWD / Senior" },
+  { to: "/admin/reports", label: "Reports" },
 ] as const;
+
+type SectionKey = "accounts" | "requests" | "problems";
 
 type Access =
   { state: "loading" } | { state: "denied"; message: string } | { state: "ok"; userId: string };
@@ -79,26 +85,39 @@ function AdminLayout() {
     );
   }
 
+  return <AdminShell userId={access.userId} />;
+}
+
+function AdminShell({ userId }: { userId: string }) {
+  const { counts, notifications, markRead, markAllRead } = useAdminAlerts();
   return (
-    <AdminContext.Provider value={{ userId: access.userId }}>
+    <AdminContext.Provider value={{ userId }}>
       <PageHero
         kicker="Barangay admin"
         title="Admin panel"
-        body="Review accounts and manage the service queue."
+        body="Review accounts, manage the service queue, and print the day's report."
       />
       <div className="border-b border-border bg-background">
-        <nav aria-label="Admin sections" className="mx-auto flex max-w-6xl gap-1 px-4">
-          {SECTIONS.map((section) => (
-            <Link
-              key={section.to}
-              to={section.to}
-              className="border-b-2 border-transparent px-4 py-3 text-sm font-medium text-muted-foreground hover:text-forest-deep"
-              activeProps={{ className: "border-gold-deep text-forest-deep" }}
-            >
-              {section.label}
-            </Link>
-          ))}
-        </nav>
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4">
+          <nav aria-label="Admin sections" className="flex gap-1 overflow-x-auto">
+            {SECTIONS.map((section) => {
+              const key = section.to.replace("/admin/", "");
+              const count = key in counts ? counts[key as SectionKey] : 0;
+              return (
+                <Link
+                  key={section.to}
+                  to={section.to}
+                  className="whitespace-nowrap border-b-2 border-transparent px-4 py-3 text-sm font-medium text-muted-foreground hover:text-forest-deep"
+                  activeProps={{ className: "border-gold-deep text-forest-deep" }}
+                >
+                  {section.label}
+                  <CountBadge count={count} />
+                </Link>
+              );
+            })}
+          </nav>
+          <AlertBell notifications={notifications} onRead={markRead} onReadAll={() => void markAllRead()} />
+        </div>
       </div>
       <div className="mx-auto max-w-6xl px-4 py-8">
         <Outlet />

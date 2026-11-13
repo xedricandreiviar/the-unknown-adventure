@@ -137,8 +137,11 @@ function PwdPage() {
             <Link to="/contact" className="font-medium text-gold-deep hover:underline">
               contact us
             </Link>{" "}
-            and ask for the PWD focal person. Online inquiry forms are coming to this portal soon.
+            and ask for the OSCA/PDAO Local person. You can also register or check your application online.
           </p>
+          <Button asChild variant="gold" className="mt-4">
+            <Link to="/registry">Register as PWD or Senior Citizen</Link>
+          </Button>
         </div>
       </Reveal>
     </div>

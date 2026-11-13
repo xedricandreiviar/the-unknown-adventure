@@ -71,7 +71,7 @@ const EMPTY: FormState = {
   consent: false,
 };
 
-type PickedDoc = { type: DocType; file: File | null };
+type PickedDoc = { type: DocType; file: File | null; file2?: File | null };
 type Check = { state: "ok" | "warn" | "todo"; text: string };
 
 function validate(f: FormState): string | null {
@@ -191,16 +191,20 @@ export function RegistrationForm({
         }
         continue;
       }
-      if (p.file.size > MAX_UPLOAD_BYTES) {
-        setError(`${g.label}: the file is larger than 5 MB. Please use a smaller photo or scan.`);
-        return;
+      // One file is required; a second (for example the back of an ID) is optional. Two at most.
+      for (const picked of [p.file, p.file2 ?? null]) {
+        if (!picked) continue;
+        if (picked.size > MAX_UPLOAD_BYTES) {
+          setError(`${g.label}: ${picked.name} is larger than 5 MB. Please use a smaller photo or scan.`);
+          return;
+        }
+        const mime = await sniffFileType(picked);
+        if (!mime) {
+          setError(`${g.label}: only JPG, PNG or PDF files are accepted.`);
+          return;
+        }
+        prepared.push({ type: p.type, file: picked, mime });
       }
-      const mime = await sniffFileType(p.file);
-      if (!mime) {
-        setError(`${g.label}: only JPG, PNG or PDF files are accepted.`);
-        return;
-      }
-      prepared.push({ type: p.type, file: p.file, mime });
     }
 
     setBusy(true);
@@ -256,7 +260,7 @@ export function RegistrationForm({
     let uploaded = 0;
     for (const d of prepared) {
       const ext = d.mime === "application/pdf" ? "pdf" : d.mime === "image/png" ? "png" : "jpg";
-      const path = `${data.id}/${d.type}-${Date.now()}.${ext}`;
+      const path = `${data.id}/${d.type}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
       const { error: upError } = await supabase.storage
         .from(DOC_BUCKET)
         .upload(path, d.file, { contentType: d.mime, upsert: false });
@@ -588,7 +592,9 @@ export function RegistrationForm({
                     aria-label={`Which document for ${g.label}`}
                     className={SELECT_CLASS}
                     value={p.type}
-                    onChange={(e) => setDoc(g.label, { type: e.target.value as DocType, file: p.file })}
+                    onChange={(e) =>
+                      setDoc(g.label, { type: e.target.value as DocType, file: p.file, file2: p.file2 ?? null })
+                    }
                   >
                     {g.anyOf.map((t) => (
                       <option key={t} value={t}>
@@ -602,12 +608,32 @@ export function RegistrationForm({
                   id={id}
                   type="file"
                   accept={FILE_ACCEPT}
-                  onChange={(e) => setDoc(g.label, { type: p.type, file: e.target.files?.[0] ?? null })}
+                  onChange={(e) =>
+                    setDoc(g.label, { type: p.type, file: e.target.files?.[0] ?? null, file2: p.file2 ?? null })
+                  }
                 />
                 {p.file && (
-                  <p className="text-xs text-muted-foreground">
-                    {p.file.name} · {Math.max(1, Math.round(p.file.size / 1024))} KB
-                  </p>
+                  <>
+                    <p className="text-xs text-muted-foreground">
+                      {p.file.name} · {Math.max(1, Math.round(p.file.size / 1024))} KB
+                    </p>
+                    <Label htmlFor={`${id}-2`} className="pt-1 text-xs font-normal text-muted-foreground">
+                      Second photo (optional), for example the back of the ID
+                    </Label>
+                    <Input
+                      id={`${id}-2`}
+                      type="file"
+                      accept={FILE_ACCEPT}
+                      onChange={(e) =>
+                        setDoc(g.label, { type: p.type, file: p.file, file2: e.target.files?.[0] ?? null })
+                      }
+                    />
+                    {p.file2 && (
+                      <p className="text-xs text-muted-foreground">
+                        {p.file2.name} · {Math.max(1, Math.round(p.file2.size / 1024))} KB
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
             );

@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { FeatureGate } from "@/components/feature-gate";
 import { PageHero } from "@/components/page-hero";
 import { Reveal } from "@/components/reveal";
 import { RegistrationForm } from "@/components/registration-form";
@@ -38,7 +39,7 @@ export const Route = createFileRoute("/registry")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: RegistryPage,
+  component: RegistryGate,
 });
 
 function RegistryPage() {
@@ -221,5 +222,13 @@ function RegistryPage() {
         )}
       </Reveal>
     </div>
+  );
+}
+
+function RegistryGate() {
+  return (
+    <FeatureGate feature="pwd_services" title="PWD & Senior registration">
+      <RegistryPage />
+    </FeatureGate>
   );
 }

@@ -122,8 +122,18 @@ export const saveAnnouncement = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => newsSchema.parse(data))
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
-    const values = { title: data.title, category: data.category, body: data.body, image_path: data.image_path ?? null, published: data.published, published_at: data.published ? new Date().toISOString() : null };
     const { id } = data;
+    // Editing a published announcement keeps its original publish date.
+    let publishedAt: string | null = data.published ? new Date().toISOString() : null;
+    if (id && data.published) {
+      const { data: existing } = await context.supabase
+        .from("announcements")
+        .select("published_at")
+        .eq("id", id)
+        .maybeSingle();
+      if (existing?.published_at) publishedAt = existing.published_at;
+    }
+    const values = { title: data.title, category: data.category, body: data.body, image_path: data.image_path ?? null, published: data.published, published_at: publishedAt };
     const { error } = id
       ? await context.supabase.from("announcements").update(values).eq("id", id)
       : await context.supabase.from("announcements").insert(values);

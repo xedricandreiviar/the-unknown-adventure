@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FeatureGate } from "@/components/feature-gate";
 import { PageHero } from "@/components/page-hero";
 import { Reveal } from "@/components/reveal";
 import { StatusBadge } from "@/components/status-badge";
@@ -21,7 +22,7 @@ export const Route = createFileRoute("/court-booking")({
     { property: "og:type", content: "website" },
     { name: "twitter:card", content: "summary_large_image" },
   ] }),
-  component: CourtBookingPage,
+  component: CourtBookingGate,
 });
 
 function CourtBookingPage() {
@@ -121,4 +122,11 @@ function CourtBookingPage() {
       </div>
     </Reveal>}
   </div>;
+}
+function CourtBookingGate() {
+  return (
+    <FeatureGate feature="court_booking" title="Court reservation">
+      <CourtBookingPage />
+    </FeatureGate>
+  );
 }

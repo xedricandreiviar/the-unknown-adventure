@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { CalendarDays, Megaphone } from "lucide-react";
+import { FeatureGate } from "@/components/feature-gate";
 import { PageHero } from "@/components/page-hero";
 import { Reveal } from "@/components/reveal";
 import { SITE } from "@/lib/site";
@@ -16,7 +17,7 @@ export const Route = createFileRoute("/announcements")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: AnnouncementsPage,
+  component: AnnouncementsGate,
 });
 
 /** Temporary placeholder announcements — replace with real data when available */
@@ -114,5 +115,13 @@ function AnnouncementsPage() {
 
       {/* more announcements will be added here */}
     </div>
+  );
+}
+
+function AnnouncementsGate() {
+  return (
+    <FeatureGate feature="news" title="News & announcements">
+      <AnnouncementsPage />
+    </FeatureGate>
   );
 }

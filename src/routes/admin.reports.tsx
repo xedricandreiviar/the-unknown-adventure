@@ -1,17 +1,24 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Printer } from "lucide-react";
+import { FileDown, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { statusMeta } from "@/components/status-badge";
+import { supabase } from "@/integrations/supabase/client";
 import { adminGetReport } from "@/lib/admin-reports.functions";
 import { SITE } from "@/lib/site";
 
 export const Route = createFileRoute("/admin/reports")({
   component: ReportsPage,
 });
+
+/** Address of the C# API (csharp-api). When it is not set, the C# download button is hidden. */
+const CSHARP_API = (import.meta.env["VITE_CSHARP_API_URL"] as string | undefined)?.replace(
+  /\/+$/,
+  "",
+);
 
 type Report = Awaited<ReturnType<typeof adminGetReport>>;
 type Preset = "today" | "yesterday" | "week" | "month" | "custom";
@@ -141,6 +148,7 @@ function ReportsPage() {
   const [report, setReport] = useState<Report | null>(null);
   const [period, setPeriod] = useState<{ from: Date; to: Date } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
   const [error, setError] = useState("");
 
   const range = useMemo(
@@ -173,6 +181,49 @@ function ReportsPage() {
     if (preset !== "custom") void load();
   }, [preset, load]);
 
+  /** Asks the C# API to build the PDF, using the admin's own login. */
+  const downloadCSharpPdf = async () => {
+    if (!CSHARP_API || !period || !report) return;
+    setPdfBusy(true);
+    setError("");
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) throw new Error("Please log in again.");
+      const query = new URLSearchParams({
+        from: period.from.toISOString(),
+        to: period.to.toISOString(),
+        preparedBy: report.preparedBy,
+      });
+      const response = await fetch(`${CSHARP_API}/api/reports/pdf?${query.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) {
+        throw new Error(
+          response.status === 403
+            ? "Only admins can download this report."
+            : `The C# report service returned an error (${response.status}).`,
+        );
+      }
+      const blob = await response.blob();
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `wawa-report-${dateInput(period.from)}.pdf`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    } catch (cause) {
+      setError(
+        cause instanceof TypeError
+          ? "Could not reach the C# report service. Is it running?"
+          : cause instanceof Error
+            ? cause.message
+            : "Could not download the PDF.",
+      );
+    } finally {
+      setPdfBusy(false);
+    }
+  };
+
   const periodText = period
     ? `${period.from.toLocaleString("en-PH", { dateStyle: "long", timeStyle: "short" })} to ${period.to.toLocaleString("en-PH", { dateStyle: "long", timeStyle: "short" })}`
     : "";
@@ -202,6 +253,17 @@ function ReportsPage() {
             <Printer className="size-4" aria-hidden />
             Print / Save as PDF
           </Button>
+          {CSHARP_API && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!report || pdfBusy}
+              onClick={() => void downloadCSharpPdf()}
+            >
+              <FileDown className="size-4" aria-hidden />
+              {pdfBusy ? "Building PDF…" : "Download PDF (C#)"}
+            </Button>
+          )}
         </div>
       </div>
 

@@ -24,9 +24,16 @@ export const Route = createFileRoute("/registry")({
   head: () => ({
     meta: [
       { title: `PWD & Senior Citizen Registration — ${SITE.name}` },
-      { name: "description", content: "Register as a PWD or senior citizen in Barangay Wawa and track your application and benefits." },
+      {
+        name: "description",
+        content:
+          "Register as a PWD or senior citizen in Barangay Wawa and track your application and benefits.",
+      },
       { property: "og:title", content: `PWD & Senior Citizen Registration — ${SITE.name}` },
-      { property: "og:description", content: "Apply online, follow your application, and see your benefit releases." },
+      {
+        property: "og:description",
+        content: "Apply online, follow your application, and see your benefit releases.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -96,7 +103,8 @@ function RegistryPage() {
         ) : !signedIn ? (
           <div className="rounded-xl border border-border bg-card p-6 text-center">
             <p className="text-sm text-muted-foreground">
-              Please log in or create a resident account first. It lets you follow your application later.
+              Please log in or create a resident account first. It lets you follow your application
+              later.
             </p>
             <Button asChild variant="gold" className="mt-4">
               <Link to="/auth">Log in / Sign up</Link>
@@ -105,14 +113,20 @@ function RegistryPage() {
         ) : (
           <>
             {loadError && (
-              <p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+              <p
+                role="alert"
+                className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive"
+              >
                 Could not load your applications: {loadError}
               </p>
             )}
 
             {mine.length > 0 && (
               <section aria-labelledby="mine-heading" className="space-y-3">
-                <h2 id="mine-heading" className="font-display text-xl font-semibold text-forest-deep">
+                <h2
+                  id="mine-heading"
+                  className="font-display text-xl font-semibold text-forest-deep"
+                >
                   My applications
                 </h2>
                 <ul className="space-y-3">
@@ -125,7 +139,9 @@ function RegistryPage() {
                             {CATEGORY_LABEL[r.category]} ·{" "}
                             <span className="font-mono text-sm">{r.reference_code}</span>
                           </p>
-                          <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLE[r.status]}`}>
+                          <span
+                            className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLE[r.status]}`}
+                          >
                             {STATUS_LABEL[r.status]}
                           </span>
                         </div>
@@ -133,13 +149,16 @@ function RegistryPage() {
                           {r.full_name} · submitted {formatDate(r.created_at)}
                         </p>
                         {r.status === "rejected" && r.rejection_reason && (
-                          <p className="mt-2 text-sm text-destructive">Reason: {r.rejection_reason}</p>
+                          <p className="mt-2 text-sm text-destructive">
+                            Reason: {r.rejection_reason}
+                          </p>
                         )}
                         {r.status === "pending" && (
                           <div className="mt-3 space-y-2 border-t border-border pt-3">
                             <p className="text-sm font-medium">Your documents</p>
                             <p className="text-xs text-muted-foreground">
-                              Staff check these against your details. Upload anything marked needed, or a new copy if a file was rejected.
+                              Staff check these against your details. Upload anything marked needed,
+                              or a new copy if a file was rejected.
                             </p>
                             <DocumentsPanel registrant={r} />
                           </div>
@@ -149,19 +168,25 @@ function RegistryPage() {
                             <p className="text-sm font-medium">Benefits</p>
                             {rel.length === 0 ? (
                               <p className="text-sm text-muted-foreground">
-                                No releases recorded yet. Watch the announcements for payout schedules.
+                                No releases recorded yet. Watch the announcements for payout
+                                schedules.
                               </p>
                             ) : (
                               <ul className="mt-1 divide-y divide-border text-sm">
                                 {rel.map((b) => (
-                                  <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                                  <li
+                                    key={b.id}
+                                    className="flex flex-wrap items-center justify-between gap-2 py-2"
+                                  >
                                     <span>
                                       {benefitLabel(b.benefit_type)} — {b.benefit_year}
                                       <span className="block text-xs text-muted-foreground">
                                         {formatPeso(b.amount)} · {formatDate(b.release_date)}
                                       </span>
                                     </span>
-                                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${RELEASE_STYLE[b.status]}`}>
+                                    <span
+                                      className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${RELEASE_STYLE[b.status]}`}
+                                    >
                                       {RELEASE_LABEL[b.status]}
                                     </span>
                                   </li>
@@ -178,10 +203,19 @@ function RegistryPage() {
             )}
 
             <section aria-labelledby="apply-heading" className="space-y-3">
-              <h2 id="apply-heading" className="font-display text-xl font-semibold text-forest-deep">
+              <h2
+                id="apply-heading"
+                className="font-display text-xl font-semibold text-forest-deep"
+              >
                 New application
               </h2>
-              <RegistrationForm mode="online" onRegistered={() => load()} />
+              <RegistrationForm
+                mode="online"
+                onRegistered={() => load()}
+                blockedCategories={mine
+                  .filter((r) => r.status === "pending" || r.status === "approved")
+                  .map((r) => r.category)}
+              />
             </section>
           </>
         )}

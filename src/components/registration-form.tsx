@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, CircleDashed } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { TablesInsert } from "@/integrations/supabase/types";
@@ -116,9 +116,12 @@ function validate(f: FormState): string | null {
 export function RegistrationForm({
   mode,
   onRegistered,
+  blockedCategories = [],
 }: {
   mode: "online" | "walk_in";
   onRegistered?: (r: Registrant) => void;
+  /** Categories this resident already has a pending or approved application for. */
+  blockedCategories?: RegistryCategory[];
 }) {
   const [f, setF] = useState<FormState>(EMPTY);
   const [docs, setDocs] = useState<Record<string, PickedDoc>>({});
@@ -127,6 +130,13 @@ export function RegistrationForm({
   const [done, setDone] = useState<Registrant | null>(null);
   const [uploadedCount, setUploadedCount] = useState(0);
   const [uploadFailures, setUploadFailures] = useState<string[]>([]);
+
+  // If the chosen category is already taken, move to the other one.
+  useEffect(() => {
+    if (!blockedCategories.includes(f.category)) return;
+    const free = (["senior", "pwd"] as const).find((c) => !blockedCategories.includes(c));
+    if (free) setF((prev) => ({ ...prev, category: free }));
+  }, [blockedCategories, f.category]);
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setF((prev) => ({ ...prev, [key]: value }));
@@ -345,6 +355,15 @@ export function RegistrationForm({
     );
   }
 
+  if (mode === "online" && blockedCategories.length >= 2) {
+    return (
+      <div className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">
+        You already have a pending or approved application for both the senior citizen and the PWD registry, so
+        there is nothing more to apply for. If one is rejected, you can apply again.
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={submit} className="space-y-5 rounded-xl border border-border bg-card p-6" noValidate>
       <fieldset className="space-y-2">
@@ -357,12 +376,19 @@ export function RegistrationForm({
               role="radio"
               aria-checked={f.category === c}
               variant={f.category === c ? "gold" : "outline"}
+              disabled={blockedCategories.includes(c)}
               onClick={() => set("category", c)}
             >
               {CATEGORY_LABEL[c]}
             </Button>
           ))}
         </div>
+        {blockedCategories.length > 0 && (
+          <p className="text-xs text-muted-foreground">
+            You already have a pending or approved application for{" "}
+            {blockedCategories.map((c) => CATEGORY_LABEL[c]).join(" and ")}, so it cannot be chosen again.
+          </p>
+        )}
       </fieldset>
 
       <fieldset className="space-y-2">

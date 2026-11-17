@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useConfirm } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -106,6 +107,7 @@ function displayAddress(account: Pick<Account, "street" | "purok">) {
 function AccountsPage() {
   const { userId } = useAdmin();
   const listFn = useServerFn(adminListAccounts);
+  const confirm = useConfirm();
   const setStatusFn = useServerFn(adminSetAccountStatus);
   const deleteFn = useServerFn(adminDeleteAccount);
   const documentFn = useServerFn(getDocumentUrl);
@@ -174,8 +176,30 @@ function AccountsPage() {
     }
   };
 
-  const changeStatus = (account: Account, status: AccountStatus, success: string, why?: string) =>
-    run(() => setStatusFn({ data: { userId: account.id, status, reason: why } }), success);
+  const changeStatus = async (
+    account: Account,
+    status: AccountStatus,
+    success: string,
+    why?: string,
+  ) => {
+    // Rejecting already asks for a reason in its own box, so only the other changes ask here.
+    if (why === undefined) {
+      const ok = await confirm({
+        title:
+          status === "approved"
+            ? `Do you want to approve ${accountLabel(account)}?`
+            : `Do you want to deactivate ${accountLabel(account)}?`,
+        description:
+          status === "approved"
+            ? "They will be able to file requests and book the court."
+            : "They will not be able to file requests until reactivated.",
+        confirmLabel: status === "approved" ? "Yes, approve" : "Yes, deactivate",
+        destructive: status !== "approved",
+      });
+      if (!ok) return;
+    }
+    await run(() => setStatusFn({ data: { userId: account.id, status, reason: why } }), success);
+  };
 
   const confirmReject = async () => {
     if (!rejecting) return;

@@ -1,3 +1,4 @@
+import { useConfirm } from "@/components/confirm-dialog";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CheckCircle2, CircleDashed, Clock, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -71,6 +72,8 @@ export function DocumentsPanel({
     void load();
   }, [load]);
 
+  const confirm = useConfirm();
+
   const togglePreview = async (d: RegistrantDocument) => {
     if (preview?.id === d.id) {
       setPreview(null);
@@ -93,6 +96,17 @@ export function DocumentsPanel({
     note: string | null,
   ) => {
     if (!adminId) return;
+    const ok = await confirm({
+      title:
+        next === "verified"
+          ? "Do you want to mark this document as verified?"
+          : "Do you want to reject this document?",
+      description:
+        next === "rejected" ? "The applicant will need to upload a new copy." : undefined,
+      confirmLabel: next === "verified" ? "Yes, verify" : "Yes, reject",
+      destructive: next === "rejected",
+    });
+    if (!ok) return;
     setMsg(null);
     const { error } = await supabase
       .from("registrant_documents")
@@ -197,6 +211,7 @@ function RequirementCard({
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const confirm = useConfirm();
 
   const kept = docs.filter((d) => d.verification_status !== "rejected");
   const state: "verified" | "pending" | "missing" = kept.some(
@@ -227,6 +242,12 @@ function RequirementCard({
       onError("Only JPG, PNG or PDF files are accepted.");
       return;
     }
+    const ok = await confirm({
+      title: "Do you want to upload this photo or file?",
+      description: `${file.name} will be added to "${group.label}".`,
+      confirmLabel: "Yes, upload it",
+    });
+    if (!ok) return;
     setBusy(true);
     const { data: auth } = await supabase.auth.getUser();
     const uid = auth.user?.id;

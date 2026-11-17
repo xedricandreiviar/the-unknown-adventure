@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/select";
 import { PageHero } from "@/components/page-hero";
 import { Reveal } from "@/components/reveal";
+import { useConfirm } from "@/components/confirm-dialog";
+import { ReviewPanel } from "@/components/review-panel";
 import { getMyProfile } from "@/lib/profiles.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { getSiteData } from "@/lib/settings.functions";
@@ -65,6 +67,7 @@ function ReportPage() {
   const siteFn = useServerFn(getSiteData);
   const profileFn = useServerFn(getMyProfile);
   const submitFn = useServerFn(submitProblemReport);
+  const confirm = useConfirm();
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -85,6 +88,7 @@ function ReportPage() {
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoError, setPhotoError] = useState("");
   const [photoInput, setPhotoInput] = useState(0);
+  const [reviewing, setReviewing] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -131,7 +135,7 @@ function ReportPage() {
   }
   const shown = (key: keyof Fields) => (attempted ? errors[key] : undefined);
 
-  const choosePhoto = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const choosePhoto = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null;
     setPhotoError("");
     if (!file) {
@@ -150,14 +154,50 @@ function ReportPage() {
       setPhotoInput((count) => count + 1);
       return;
     }
+    const ok = await confirm({
+      title: "Do you want to upload this photo?",
+      description: `${file.name} will be attached to your report.`,
+      confirmLabel: "Yes, upload it",
+    });
+    if (!ok) {
+      setPhoto(null);
+      setPhotoInput((count) => count + 1);
+      return;
+    }
     setPhoto(file);
   };
 
-  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const removePhoto = async () => {
+    const ok = await confirm({
+      title: "Do you want to remove this photo?",
+      confirmLabel: "Yes, remove it",
+      destructive: true,
+    });
+    if (!ok) return;
+    setPhoto(null);
+    setPhotoInput((count) => count + 1);
+  };
+
+  // Step 1: check the form, then show the review page.
+  const goToReview = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setAttempted(true);
     setSubmitError("");
     if (!parsed.success || !profile) return;
+    setReviewing(true);
+    window.scrollTo({ top: 0 });
+  };
+
+  // Step 2: ask once more, then send.
+  const submit = async () => {
+    if (!parsed.success || !profile) return;
+    const ok = await confirm({
+      title: "Do you want to submit this report?",
+      description: "The barangay will receive it right away.",
+      confirmLabel: "Yes, submit",
+    });
+    if (!ok) return;
+    setSubmitError("");
     setBusy(true);
     let photoPath: string | undefined;
     try {
@@ -185,6 +225,7 @@ function ReportPage() {
     setAttempted(false);
     setSubmitError("");
     setDone(false);
+    setReviewing(false);
     setPhoto(null);
     setPhotoError("");
     setPhotoInput((count) => count + 1);
@@ -268,11 +309,45 @@ function ReportPage() {
     );
   }
 
+  if (reviewing && parsed.success) {
+    return (
+      <div>
+        {hero}
+        <div className="mx-auto max-w-3xl px-4 py-12">
+          <ReviewPanel
+            intro="Check your report. Nothing is sent until you press Submit report."
+            rows={[
+              { label: "Category", value: fields.category },
+              { label: "Problem", value: fields.description.trim() },
+              {
+                label: "Location",
+                value: [fields.street, fields.purok, fields.barangay]
+                  .map((part) => part.trim())
+                  .filter(Boolean)
+                  .join(", "),
+              },
+              { label: "Photo", value: photo ? photo.name : "" },
+            ]}
+            busy={busy}
+            error={submitError}
+            submitLabel="Submit report"
+            busyLabel="Sending report…"
+            onBack={() => {
+              setSubmitError("");
+              setReviewing(false);
+            }}
+            onSubmit={() => void submit()}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       {hero}
       <Reveal as="section" className="mx-auto max-w-3xl px-4 py-12">
-        <form onSubmit={(event) => void submit(event)} noValidate className="space-y-6">
+        <form onSubmit={goToReview} noValidate className="space-y-6">
           <div className="space-y-2">
             <Label htmlFor="report-category">Category</Label>
             <Select value={fields.category} onValueChange={(value) => set("category", value)}>
@@ -379,9 +454,17 @@ function ReportPage() {
               id="report-photo"
               type="file"
               accept="image/jpeg,image/png,image/webp"
-              onChange={choosePhoto}
+              onChange={(event) => void choosePhoto(event)}
               aria-invalid={!!photoError}
             />
+            {photo && (
+              <p className="flex items-center gap-3 text-sm">
+                <span className="truncate">Attached: {photo.name}</span>
+                <Button type="button" size="sm" variant="ghost" onClick={() => void removePhoto()}>
+                  Remove
+                </Button>
+              </p>
+            )}
             <p className="text-xs text-muted-foreground">
               A clear photo helps the barangay find the problem. JPG, PNG or WebP, up to 5 MB.
             </p>
@@ -397,9 +480,7 @@ function ReportPage() {
               {submitError}
             </p>
           )}
-          <Button variant="gold" disabled={busy}>
-            {busy ? "Sending report…" : "Send report"}
-          </Button>
+          <Button variant="gold">Review report</Button>
         </form>
       </Reveal>
     </div>

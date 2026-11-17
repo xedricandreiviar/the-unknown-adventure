@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useState } from "react";
 import { Plus } from "lucide-react";
+import { useConfirm } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -101,6 +102,7 @@ function SettingsPage() {
   const [flags, setFlags] = useState<SiteFlag[]>([]);
   const [services, setServices] = useState<SiteService[]>([]);
   const [loading, setLoading] = useState(true);
+  const confirm = useConfirm();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -155,18 +157,34 @@ function SettingsPage() {
       setMessage("");
       return;
     }
+    const ok = await confirm({
+      title: "Do you want to save these office details?",
+      description: "They show on the public website right away.",
+      confirmLabel: "Yes, save",
+    });
+    if (!ok) return;
     await run(async () => {
       await settingsFn({ data: parsed.data });
     }, "Office details saved.");
   };
 
-  const toggleFlag = (flag: SiteFlag, enabled: boolean) =>
-    run(
+  const toggleFlag = async (flag: SiteFlag, enabled: boolean) => {
+    const ok = await confirm({
+      title: `Do you want to turn ${flag.label} ${enabled ? "on" : "off"}?`,
+      description: enabled
+        ? "Residents will be able to use it."
+        : "Residents will not be able to use it.",
+      confirmLabel: enabled ? "Yes, turn on" : "Yes, turn off",
+      destructive: !enabled,
+    });
+    if (!ok) return;
+    await run(
       async () => {
         await flagFn({ data: { key: flag.key, enabled } });
       },
       `${flag.label} is now ${enabled ? "on" : "off"}.`,
     );
+  };
 
   const submitService = async () => {
     if (!serviceDraft) return;
@@ -188,6 +206,13 @@ function SettingsPage() {
       return;
     }
     setServiceError("");
+    const ok = await confirm({
+      title: serviceDraft.id
+        ? "Do you want to save this service?"
+        : "Do you want to add this service?",
+      confirmLabel: "Yes, save",
+    });
+    if (!ok) return;
     const wasNew = !serviceDraft.id;
     const payload = parsed.data;
     setServiceDraft(null);

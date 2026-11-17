@@ -141,6 +141,13 @@ export const newsSchema = z.object({
   body: required("Body", 8000),
   image_path: z.string().trim().max(400).optional().nullable(),
   published: z.boolean().default(false),
+  /** When the announcement starts showing on the public site. Empty means right away. */
+  show_from: z.string().datetime({ offset: true }).optional().nullable(),
+  /** When it is taken down again. Empty means it stays until unpublished or deleted. */
+  show_until: z.string().datetime({ offset: true }).optional().nullable(),
+}).refine((d) => !d.show_from || !d.show_until || new Date(d.show_until) > new Date(d.show_from), {
+  message: "The removal time must be after the start time.",
+  path: ["show_until"],
 });
 
 export const rejectReason = (label: string) =>

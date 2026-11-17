@@ -133,7 +133,18 @@ export const saveAnnouncement = createServerFn({ method: "POST" })
         .maybeSingle();
       if (existing?.published_at) publishedAt = existing.published_at;
     }
-    const values = { title: data.title, category: data.category, body: data.body, image_path: data.image_path ?? null, published: data.published, published_at: publishedAt };
+    // A scheduled announcement is dated by the day it starts showing.
+    if (data.published && data.show_from) publishedAt = data.show_from;
+    const values = {
+      title: data.title,
+      category: data.category,
+      body: data.body,
+      image_path: data.image_path ?? null,
+      published: data.published,
+      published_at: publishedAt,
+      show_from: data.show_from ?? null,
+      show_until: data.show_until ?? null,
+    };
     const { error } = id
       ? await context.supabase.from("announcements").update(values).eq("id", id)
       : await context.supabase.from("announcements").insert(values);

@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ConsentCheckbox } from "@/components/consent-checkbox";
 import { DocumentsPanel } from "@/components/documents-panel";
+import { useConfirm } from "@/components/confirm-dialog";
+import { ReviewPanel, type ReviewRow } from "@/components/review-panel";
 import {
   CATEGORY_LABEL,
   CIVIL_STATUSES,
@@ -77,7 +79,8 @@ type Check = { state: "ok" | "warn" | "todo"; text: string };
 function validate(f: FormState): string | null {
   if (f.applicantType === "representative") {
     if (f.repName.trim().length < 2) return "Please enter the representative's full name.";
-    if (!f.repRelationship.trim()) return "Please enter the representative's relationship to the beneficiary.";
+    if (!f.repRelationship.trim())
+      return "Please enter the representative's relationship to the beneficiary.";
     if (!PH_MOBILE.test(f.repContact.replace(/[\s-]/g, ""))) {
       return "Enter the representative's mobile number, like 09171234567.";
     }
@@ -123,6 +126,8 @@ export function RegistrationForm({
   /** Categories this resident already has a pending or approved application for. */
   blockedCategories?: RegistryCategory[];
 }) {
+  const confirm = useConfirm();
+  const [reviewing, setReviewing] = useState(false);
   const [f, setF] = useState<FormState>(EMPTY);
   const [docs, setDocs] = useState<Record<string, PickedDoc>>({});
   const [busy, setBusy] = useState(false);
@@ -145,7 +150,8 @@ export function RegistrationForm({
   const groups = requiredDocGroups(f.category, isRep);
   const pickedFor = (label: string, anyOf: DocType[]): PickedDoc =>
     docs[label] ?? { type: anyOf[0] ?? "valid_id", file: null };
-  const setDoc = (label: string, value: PickedDoc) => setDocs((prev) => ({ ...prev, [label]: value }));
+  const setDoc = (label: string, value: PickedDoc) =>
+    setDocs((prev) => ({ ...prev, [label]: value }));
 
   // Live checks shown to the applicant before submitting (staff repeat and expand these).
   const today = new Date().toISOString().slice(0, 10);
@@ -166,7 +172,10 @@ export function RegistrationForm({
       ? { state: "todo", text: "Enter the home address (it should be in Wawa)." }
       : /wawa/i.test(f.address)
         ? { state: "ok", text: "The address is in Wawa." }
-        : { state: "warn", text: "The address does not mention Wawa. Staff will check the proof of residence carefully." },
+        : {
+            state: "warn",
+            text: "The address does not mention Wawa. Staff will check the proof of residence carefully.",
+          },
   );
   if (f.category === "pwd" && f.idExpiry) {
     checks.push(
@@ -181,8 +190,40 @@ export function RegistrationForm({
       : { state: "todo", text: `${attached} of ${groups.length} required documents attached.` },
   );
 
-  const submit = async (e: React.FormEvent) => {
+  // Step 1: check the form, then show the review page.
+  const goToReview = (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+    const problem = validate(f);
+    if (problem) {
+      setError(problem);
+      return;
+    }
+    if (mode === "online") {
+      const missing = groups.find((g) => !docs[g.label]?.file);
+      if (missing) {
+        setError(`Please attach: ${missing.label}.`);
+        return;
+      }
+    }
+    setReviewing(true);
+    window.scrollTo({ top: 0 });
+  };
+
+  // Step 2: ask once more, then save and upload.
+  const submit = async () => {
+    const ok = await confirm({
+      title:
+        mode === "online"
+          ? "Do you want to submit this application?"
+          : "Do you want to save this registrant?",
+      description:
+        mode === "online"
+          ? "Barangay staff will check your details and documents."
+          : "The record and its documents will be saved for verification.",
+      confirmLabel: "Yes, submit",
+    });
+    if (!ok) return;
     setError(null);
     const problem = validate(f);
     if (problem) {
@@ -191,7 +232,11 @@ export function RegistrationForm({
     }
 
     // Check the attached files before anything is saved.
-    const prepared: { type: DocType; file: File; mime: "image/jpeg" | "image/png" | "application/pdf" }[] = [];
+    const prepared: {
+      type: DocType;
+      file: File;
+      mime: "image/jpeg" | "image/png" | "application/pdf";
+    }[] = [];
     for (const g of groups) {
       const p = docs[g.label];
       if (!p?.file) {
@@ -205,7 +250,9 @@ export function RegistrationForm({
       for (const picked of [p.file, p.file2 ?? null]) {
         if (!picked) continue;
         if (picked.size > MAX_UPLOAD_BYTES) {
-          setError(`${g.label}: ${picked.name} is larger than 5 MB. Please use a smaller photo or scan.`);
+          setError(
+            `${g.label}: ${picked.name} is larger than 5 MB. Please use a smaller photo or scan.`,
+          );
           return;
         }
         const mime = await sniffFileType(picked);
@@ -325,8 +372,13 @@ export function RegistrationForm({
               : "Staff can now verify the documents and complete the cross-checks before approving."}
           </p>
           {uploadFailures.length > 0 && (
-            <div role="alert" className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
-              <p className="font-medium">The application was saved, but these files did not upload:</p>
+            <div
+              role="alert"
+              className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950"
+            >
+              <p className="font-medium">
+                The application was saved, but these files did not upload:
+              </p>
               <ul className="mt-1 list-disc pl-5">
                 {uploadFailures.map((m) => (
                   <li key={m}>{m}</li>
@@ -358,14 +410,69 @@ export function RegistrationForm({
   if (mode === "online" && blockedCategories.length >= 2) {
     return (
       <div className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">
-        You already have a pending or approved application for both the senior citizen and the PWD registry, so
-        there is nothing more to apply for. If one is rejected, you can apply again.
+        You already have a pending or approved application for both the senior citizen and the PWD
+        registry, so there is nothing more to apply for. If one is rejected, you can apply again.
       </div>
     );
   }
 
+  if (reviewing) {
+    const fileNames = (g: { label: string }) => {
+      const p = docs[g.label];
+      return [p?.file?.name, p?.file2?.name].filter(Boolean).join(", ");
+    };
+    const rows: ReviewRow[] = [
+      { label: "Registry", value: CATEGORY_LABEL[f.category] },
+      { label: "Applying", value: isRep ? "On behalf of the beneficiary" : "For myself" },
+      ...(isRep
+        ? [
+            { label: "Representative", value: f.repName.trim() },
+            { label: "Relationship", value: f.repRelationship.trim() },
+            { label: "Rep. contact", value: f.repContact.trim() },
+          ]
+        : []),
+      { label: "Full name", value: f.fullName.trim() },
+      { label: "Date of birth", value: formatDate(f.birthDate) },
+      { label: "Sex", value: f.sex },
+      { label: "Civil status", value: f.civilStatus },
+      { label: "Address", value: f.address.trim() },
+      { label: "Contact number", value: f.contactNumber.trim() },
+      ...(f.category === "pwd"
+        ? [
+            { label: "Disability type", value: f.disabilityType },
+            { label: "PWD ID number", value: f.idNumber.trim() },
+            { label: "PWD ID expires", value: f.idExpiry ? formatDate(f.idExpiry) : "" },
+          ]
+        : [
+            { label: "Applying for pension", value: f.pensionApplicant ? "Yes" : "No" },
+            { label: "Receives another pension", value: f.receivesOtherPension ? "Yes" : "No" },
+          ]),
+      ...groups.map((g) => ({ label: g.label, value: fileNames(g) })),
+      { label: "Data privacy consent", value: f.consent ? "Agreed" : "" },
+    ];
+    return (
+      <ReviewPanel
+        intro={`Check your answers. Nothing is saved until you press ${mode === "online" ? "Submit application" : "Save registrant"}.`}
+        rows={rows}
+        busy={busy}
+        error={error ?? undefined}
+        submitLabel={mode === "online" ? "Submit application" : "Save registrant"}
+        busyLabel="Saving and uploading…"
+        onBack={() => {
+          setError(null);
+          setReviewing(false);
+        }}
+        onSubmit={() => void submit()}
+      />
+    );
+  }
+
   return (
-    <form onSubmit={submit} className="space-y-5 rounded-xl border border-border bg-card p-6" noValidate>
+    <form
+      onSubmit={goToReview}
+      className="space-y-5 rounded-xl border border-border bg-card p-6"
+      noValidate
+    >
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium">Registering as</legend>
         <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Category">
@@ -386,7 +493,8 @@ export function RegistrationForm({
         {blockedCategories.length > 0 && (
           <p className="text-xs text-muted-foreground">
             You already have a pending or approved application for{" "}
-            {blockedCategories.map((c) => CATEGORY_LABEL[c]).join(" and ")}, so it cannot be chosen again.
+            {blockedCategories.map((c) => CATEGORY_LABEL[c]).join(" and ")}, so it cannot be chosen
+            again.
           </p>
         )}
       </fieldset>
@@ -415,8 +523,8 @@ export function RegistrationForm({
         </div>
         {isRep && (
           <p className="text-xs text-muted-foreground">
-            Put the beneficiary's details in the fields below. You will need to attach a signed authorization
-            letter and the representative's valid ID. Staff will verify both.
+            Put the beneficiary's details in the fields below. You will need to attach a signed
+            authorization letter and the representative's valid ID. Staff will verify both.
           </p>
         )}
       </fieldset>
@@ -425,7 +533,12 @@ export function RegistrationForm({
         <div className="grid gap-4 rounded-lg bg-secondary/50 p-4 sm:grid-cols-2">
           <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="repName">Representative's full name</Label>
-            <Input id="repName" value={f.repName} onChange={(e) => set("repName", e.target.value)} required />
+            <Input
+              id="repName"
+              value={f.repName}
+              onChange={(e) => set("repName", e.target.value)}
+              required
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="repRelationship">Relationship to the beneficiary</Label>
@@ -473,7 +586,9 @@ export function RegistrationForm({
             required
           />
           {f.category === "senior" && f.birthDate && ageFromBirthDate(f.birthDate) < 60 && (
-            <p className="text-xs text-destructive">Senior citizens must be at least 60 years old.</p>
+            <p className="text-xs text-destructive">
+              Senior citizens must be at least 60 years old.
+            </p>
           )}
         </div>
         <div className="space-y-1.5">
@@ -550,14 +665,24 @@ export function RegistrationForm({
 
         <div className="space-y-1.5">
           <Label htmlFor="idNumber">
-            Existing {f.category === "pwd" ? "PWD ID" : "Senior Citizen (OSCA) ID"} number (optional)
+            Existing {f.category === "pwd" ? "PWD ID" : "Senior Citizen (OSCA) ID"} number
+            (optional)
           </Label>
-          <Input id="idNumber" value={f.idNumber} onChange={(e) => set("idNumber", e.target.value)} />
+          <Input
+            id="idNumber"
+            value={f.idNumber}
+            onChange={(e) => set("idNumber", e.target.value)}
+          />
         </div>
         {f.category === "pwd" && (
           <div className="space-y-1.5">
             <Label htmlFor="idExpiry">PWD ID expiry date</Label>
-            <Input id="idExpiry" type="date" value={f.idExpiry} onChange={(e) => set("idExpiry", e.target.value)} />
+            <Input
+              id="idExpiry"
+              type="date"
+              value={f.idExpiry}
+              onChange={(e) => set("idExpiry", e.target.value)}
+            />
             <p className="text-xs text-muted-foreground">A PWD ID is valid for 3 years.</p>
           </div>
         )}
@@ -573,7 +698,10 @@ export function RegistrationForm({
               onCheckedChange={(v) => set("pensionApplicant", v === true)}
               className="mt-0.5"
             />
-            <Label htmlFor="pensionApplicant" className="cursor-pointer text-sm font-normal leading-snug">
+            <Label
+              htmlFor="pensionApplicant"
+              className="cursor-pointer text-sm font-normal leading-snug"
+            >
               Consider this senior for the social pension for indigent senior citizens.
             </Label>
           </div>
@@ -584,7 +712,10 @@ export function RegistrationForm({
               onCheckedChange={(v) => set("receivesOtherPension", v === true)}
               className="mt-0.5"
             />
-            <Label htmlFor="receivesOtherPension" className="cursor-pointer text-sm font-normal leading-snug">
+            <Label
+              htmlFor="receivesOtherPension"
+              className="cursor-pointer text-sm font-normal leading-snug"
+            >
               This senior already receives a pension from SSS, GSIS, or a similar program.
             </Label>
           </div>
@@ -600,8 +731,8 @@ export function RegistrationForm({
           {mode === "online"
             ? "Attach a clear photo or scan of each document. "
             : "Attach scans of what the resident brought. You can also add them later from the record. "}
-          JPG, PNG or PDF, up to 5 MB each. They are private: only barangay staff and the applicant can open them.
-          Staff compare each one with the details above before approving.
+          JPG, PNG or PDF, up to 5 MB each. They are private: only barangay staff and the applicant
+          can open them. Staff compare each one with the details above before approving.
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
           {groups.map((g) => {
@@ -619,7 +750,11 @@ export function RegistrationForm({
                     className={SELECT_CLASS}
                     value={p.type}
                     onChange={(e) =>
-                      setDoc(g.label, { type: e.target.value as DocType, file: p.file, file2: p.file2 ?? null })
+                      setDoc(g.label, {
+                        type: e.target.value as DocType,
+                        file: p.file,
+                        file2: p.file2 ?? null,
+                      })
                     }
                   >
                     {g.anyOf.map((t) => (
@@ -635,7 +770,11 @@ export function RegistrationForm({
                   type="file"
                   accept={FILE_ACCEPT}
                   onChange={(e) =>
-                    setDoc(g.label, { type: p.type, file: e.target.files?.[0] ?? null, file2: p.file2 ?? null })
+                    setDoc(g.label, {
+                      type: p.type,
+                      file: e.target.files?.[0] ?? null,
+                      file2: p.file2 ?? null,
+                    })
                   }
                 />
                 {p.file && (
@@ -643,7 +782,10 @@ export function RegistrationForm({
                     <p className="text-xs text-muted-foreground">
                       {p.file.name} · {Math.max(1, Math.round(p.file.size / 1024))} KB
                     </p>
-                    <Label htmlFor={`${id}-2`} className="pt-1 text-xs font-normal text-muted-foreground">
+                    <Label
+                      htmlFor={`${id}-2`}
+                      className="pt-1 text-xs font-normal text-muted-foreground"
+                    >
                       Second photo (optional), for example the back of the ID
                     </Label>
                     <Input
@@ -651,7 +793,11 @@ export function RegistrationForm({
                       type="file"
                       accept={FILE_ACCEPT}
                       onChange={(e) =>
-                        setDoc(g.label, { type: p.type, file: p.file, file2: e.target.files?.[0] ?? null })
+                        setDoc(g.label, {
+                          type: p.type,
+                          file: p.file,
+                          file2: e.target.files?.[0] ?? null,
+                        })
                       }
                     />
                     {p.file2 && (
@@ -675,9 +821,15 @@ export function RegistrationForm({
               {c.state === "ok" ? (
                 <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600" aria-label="OK" />
               ) : c.state === "warn" ? (
-                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600" aria-label="Check" />
+                <AlertTriangle
+                  className="mt-0.5 size-4 shrink-0 text-amber-600"
+                  aria-label="Check"
+                />
               ) : (
-                <CircleDashed className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-label="To do" />
+                <CircleDashed
+                  className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                  aria-label="To do"
+                />
               )}
               <span>{c.text}</span>
             </li>
@@ -698,8 +850,12 @@ export function RegistrationForm({
             onCheckedChange={(v) => set("consent", v === true)}
             className="mt-0.5"
           />
-          <Label htmlFor="walkin-consent" className="cursor-pointer text-sm font-normal leading-snug">
-            The resident agreed to have their personal data and documents recorded for this registry (Data Privacy Act).
+          <Label
+            htmlFor="walkin-consent"
+            className="cursor-pointer text-sm font-normal leading-snug"
+          >
+            The resident agreed to have their personal data and documents recorded for this registry
+            (Data Privacy Act).
           </Label>
         </div>
       )}
@@ -710,8 +866,8 @@ export function RegistrationForm({
         </p>
       )}
 
-      <Button type="submit" variant="gold" className="w-full sm:w-auto" disabled={busy}>
-        {busy ? "Saving and uploading…" : mode === "online" ? "Submit application" : "Save registrant"}
+      <Button type="submit" variant="gold" className="w-full sm:w-auto">
+        Review answers
       </Button>
     </form>
   );

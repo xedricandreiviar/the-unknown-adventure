@@ -16,6 +16,8 @@ export type Database = {
     Tables: {
       announcements: {
         Row: {
+          show_from: string | null
+          show_until: string | null
           body: string
           category: string
           created_at: string
@@ -27,6 +29,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          show_from?: string | null
+          show_until?: string | null
           body: string
           category?: string
           created_at?: string
@@ -38,6 +42,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          show_from?: string | null
+          show_until?: string | null
           body?: string
           category?: string
           created_at?: string

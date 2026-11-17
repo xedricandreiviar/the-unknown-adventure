@@ -15,6 +15,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { LanguageProvider } from "@/lib/i18n";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { ConfirmProvider } from "@/components/confirm-dialog";
 import { SITE } from "@/lib/site";
 
 function NotFoundComponent() {
@@ -83,9 +84,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: `${SITE.name} — ${SITE.city}` },
-      { name: "description", content: `${SITE.name}: barangay services, the PWD portal, and court booking for residents of Wawa, ${SITE.city}.` },
+      {
+        name: "description",
+        content: `${SITE.name}: barangay services, the PWD portal, and court booking for residents of Wawa, ${SITE.city}.`,
+      },
       { property: "og:title", content: `${SITE.name} — ${SITE.city}` },
-      { property: "og:description", content: `Barangay services, PWD portal, and court booking for Wawa residents.` },
+      {
+        property: "og:description",
+        content: `Barangay services, PWD portal, and court booking for Wawa residents.`,
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -129,14 +136,16 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <LanguageProvider>
-        <div className="flex min-h-screen flex-col">
-          <SiteHeader />
-          {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-          <main className="flex-1">
-            <Outlet />
-          </main>
-          <SiteFooter />
-        </div>
+        <ConfirmProvider>
+          <div className="flex min-h-screen flex-col">
+            <SiteHeader />
+            {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+            <main className="flex-1">
+              <Outlet />
+            </main>
+            <SiteFooter />
+          </div>
+        </ConfirmProvider>
       </LanguageProvider>
     </QueryClientProvider>
   );

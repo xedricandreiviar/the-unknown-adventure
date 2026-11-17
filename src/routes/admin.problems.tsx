@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useConfirm } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -92,6 +93,7 @@ type Closing = { report: Report; outcome: "resolved" | "rejected" };
 
 function ProblemsPage() {
   const listFn = useServerFn(adminListProblemReports);
+  const confirm = useConfirm();
   const updateFn = useServerFn(adminUpdateProblemReport);
 
   const [reports, setReports] = useState<Report[]>([]);
@@ -147,6 +149,15 @@ function ProblemsPage() {
   }, [reports, view, search]);
 
   const update = async (item: Report, status: ProblemStatus, done: string, adminReply?: string) => {
+    // Closing a report already asks for a reply in its own box.
+    if (adminReply === undefined) {
+      const ok = await confirm({
+        title: "Do you want to update this report?",
+        description: `It will be marked as ${status.replace(/_/g, " ")}. The resident is notified.`,
+        confirmLabel: "Yes, update",
+      });
+      if (!ok) return;
+    }
     setBusy(true);
     setError("");
     setMessage("");

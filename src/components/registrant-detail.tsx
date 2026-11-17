@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useConfirm } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -48,11 +49,17 @@ function automatedFlags(r: Registrant, all: Registrant[]): Flag[] {
   flags.push(
     /wawa/i.test(r.address)
       ? { level: "ok", text: "The address mentions Wawa." }
-      : { level: "warn", text: "The address does not mention Wawa. Check the proof of residence carefully." },
+      : {
+          level: "warn",
+          text: "The address does not mention Wawa. Check the proof of residence carefully.",
+        },
   );
 
   const samePersonOther = others.filter(
-    (o) => o.category !== r.category && norm(o.full_name) === norm(r.full_name) && o.birth_date === r.birth_date,
+    (o) =>
+      o.category !== r.category &&
+      norm(o.full_name) === norm(r.full_name) &&
+      o.birth_date === r.birth_date,
   );
   for (const o of samePersonOther) {
     flags.push({
@@ -62,25 +69,38 @@ function automatedFlags(r: Registrant, all: Registrant[]): Flag[] {
   }
 
   const samePersonSame = others.filter(
-    (o) => o.category === r.category && norm(o.full_name) === norm(r.full_name) && o.birth_date === r.birth_date,
+    (o) =>
+      o.category === r.category &&
+      norm(o.full_name) === norm(r.full_name) &&
+      o.birth_date === r.birth_date,
   );
   for (const o of samePersonSame) {
-    flags.push({ level: "bad", text: `Possible duplicate of ${o.reference_code} (same name and birth date).` });
+    flags.push({
+      level: "bad",
+      text: `Possible duplicate of ${o.reference_code} (same name and birth date).`,
+    });
   }
 
   if (r.id_number) {
     const dupId = others.filter((o) => o.id_number && norm(o.id_number) === norm(r.id_number));
     flags.push(
       dupId.length > 0
-        ? { level: "bad", text: `ID number ${r.id_number} is also used by ${dupId.map((o) => o.reference_code).join(", ")}.` }
+        ? {
+            level: "bad",
+            text: `ID number ${r.id_number} is also used by ${dupId.map((o) => o.reference_code).join(", ")}.`,
+          }
         : { level: "ok", text: "The ID number is not used by any other registrant." },
     );
   }
 
   if (r.category === "pwd" && r.id_expiry) {
-    const days = Math.round((new Date(`${r.id_expiry}T00:00:00`).getTime() - Date.now()) / 86_400_000);
-    if (days < 0) flags.push({ level: "bad", text: `The PWD ID expired on ${formatDate(r.id_expiry)}.` });
-    else if (days <= 90) flags.push({ level: "warn", text: `The PWD ID expires soon (${formatDate(r.id_expiry)}).` });
+    const days = Math.round(
+      (new Date(`${r.id_expiry}T00:00:00`).getTime() - Date.now()) / 86_400_000,
+    );
+    if (days < 0)
+      flags.push({ level: "bad", text: `The PWD ID expired on ${formatDate(r.id_expiry)}.` });
+    else if (days <= 90)
+      flags.push({ level: "warn", text: `The PWD ID expires soon (${formatDate(r.id_expiry)}).` });
     else flags.push({ level: "ok", text: `The PWD ID is valid until ${formatDate(r.id_expiry)}.` });
   }
 
@@ -98,10 +118,16 @@ function automatedFlags(r: Registrant, all: Registrant[]): Flag[] {
 
   if (r.applicant_type === "representative") {
     if (norm(r.rep_full_name) === norm(r.full_name)) {
-      flags.push({ level: "warn", text: "The representative has the same name as the beneficiary." });
+      flags.push({
+        level: "warn",
+        text: "The representative has the same name as the beneficiary.",
+      });
     }
     const sameRep = others.filter(
-      (o) => o.applicant_type === "representative" && r.rep_contact_number && o.rep_contact_number === r.rep_contact_number,
+      (o) =>
+        o.applicant_type === "representative" &&
+        r.rep_contact_number &&
+        o.rep_contact_number === r.rep_contact_number,
     );
     if (sameRep.length > 0) {
       flags.push({
@@ -114,27 +140,41 @@ function automatedFlags(r: Registrant, all: Registrant[]): Flag[] {
   if (r.user_id) {
     const sameAccount = others.filter((o) => o.user_id === r.user_id);
     if (sameAccount.length >= 3) {
-      flags.push({ level: "warn", text: `This account submitted ${sameAccount.length} other applications.` });
+      flags.push({
+        level: "warn",
+        text: `This account submitted ${sameAccount.length} other applications.`,
+      });
     }
   }
 
   return flags;
 }
 
-type CheckKey = "chk_name_dob" | "chk_residency" | "chk_photo_match" | "chk_disability" | "chk_representative";
+type CheckKey =
+  "chk_name_dob" | "chk_residency" | "chk_photo_match" | "chk_disability" | "chk_representative";
 
 const CHECKS: { key: CheckKey; label: string; show: (r: Registrant) => boolean }[] = [
-  { key: "chk_name_dob", label: "Name and birth date on the documents match this record", show: () => true },
-  { key: "chk_residency", label: "The address on the proof of residence matches this record and is in Wawa", show: () => true },
+  {
+    key: "chk_name_dob",
+    label: "Name and birth date on the documents match this record",
+    show: () => true,
+  },
+  {
+    key: "chk_residency",
+    label: "The address on the proof of residence matches this record and is in Wawa",
+    show: () => true,
+  },
   { key: "chk_photo_match", label: "The face in the ID photo matches the IDs", show: () => true },
   {
     key: "chk_disability",
-    label: "The disability certificate is from the right licensed specialist and matches the disability type",
+    label:
+      "The disability certificate is from the right licensed specialist and matches the disability type",
     show: (r) => r.category === "pwd",
   },
   {
     key: "chk_representative",
-    label: "The authorization letter is signed and the representative's ID matches the representative",
+    label:
+      "The authorization letter is signed and the representative's ID matches the representative",
     show: (r) => r.applicant_type === "representative",
   },
 ];
@@ -160,6 +200,7 @@ export function RegistrantDetail({
   onChanged: () => void;
 }) {
   const [reason, setReason] = useState("");
+  const confirm = useConfirm();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [blockers, setBlockers] = useState<string[] | null>(null);
@@ -246,6 +287,19 @@ export function RegistrantDetail({
       setMsg("Please type the reason for rejecting.");
       return;
     }
+    const ok = await confirm({
+      title:
+        next === "approved"
+          ? "Do you want to approve this application?"
+          : "Do you want to reject this application?",
+      description:
+        next === "approved"
+          ? "The applicant is added to the registry."
+          : "The applicant is told the reason.",
+      confirmLabel: next === "approved" ? "Yes, approve" : "Yes, reject",
+      destructive: next === "rejected",
+    });
+    if (!ok) return;
     setBusy(true);
     setMsg(null);
     const { error } = await supabase
@@ -305,6 +359,11 @@ export function RegistrantDetail({
       setMsg("Please enter a valid year.");
       return;
     }
+    const ok = await confirm({
+      title: `Do you want to schedule all ${year} releases?`,
+      confirmLabel: "Yes, schedule",
+    });
+    if (!ok) return;
     setBusy(true);
     setMsg(null);
     const rows = options.map((b) => ({
@@ -338,6 +397,12 @@ export function RegistrantDetail({
   };
 
   const markReleased = async (id: string) => {
+    const ok = await confirm({
+      title: "Do you want to mark this as released?",
+      description: "This records that the benefit was handed over.",
+      confirmLabel: "Yes, mark released",
+    });
+    if (!ok) return;
     setBusy(true);
     setMsg(null);
     const isRep = claim.by === "representative";
@@ -362,6 +427,12 @@ export function RegistrantDetail({
   };
 
   const setReleaseStatus = async (id: string, next: ReleaseStatus) => {
+    const ok = await confirm({
+      title: "Do you want to change this release?",
+      description: `It will be set to ${next}.`,
+      confirmLabel: "Yes, change it",
+    });
+    if (!ok) return;
     const { error } = await supabase
       .from("registry_releases")
       .update({ status: next, release_date: null })
@@ -379,9 +450,13 @@ export function RegistrantDetail({
     ["Civil status", r.civil_status ?? "—"],
     ["Address", r.address],
     ["Contact", r.contact_number ?? "—"],
-    ...(r.category === "pwd" ? ([["Disability", r.disability_type ?? "—"]] as [string, string][]) : []),
+    ...(r.category === "pwd"
+      ? ([["Disability", r.disability_type ?? "—"]] as [string, string][])
+      : []),
     ["Existing ID no.", r.id_number ?? "—"],
-    ...(r.category === "pwd" ? ([["PWD ID expiry", formatDate(r.id_expiry)]] as [string, string][]) : []),
+    ...(r.category === "pwd"
+      ? ([["PWD ID expiry", formatDate(r.id_expiry)]] as [string, string][])
+      : []),
     ...(r.category === "senior"
       ? ([
           ["Wants social pension", r.pension_applicant ? "Yes" : "No"],
@@ -423,7 +498,10 @@ export function RegistrantDetail({
               {f.level === "ok" ? (
                 <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600" aria-label="OK" />
               ) : f.level === "warn" ? (
-                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600" aria-label="Check" />
+                <AlertTriangle
+                  className="mt-0.5 size-4 shrink-0 text-amber-600"
+                  aria-label="Check"
+                />
               ) : (
                 <XCircle className="mt-0.5 size-4 shrink-0 text-red-600" aria-label="Problem" />
               )}
@@ -451,7 +529,10 @@ export function RegistrantDetail({
                 onCheckedChange={(v) => toggleCheck(c.key, v === true)}
                 className="mt-0.5"
               />
-              <Label htmlFor={`${c.key}-${r.id}`} className="cursor-pointer text-sm font-normal leading-snug">
+              <Label
+                htmlFor={`${c.key}-${r.id}`}
+                className="cursor-pointer text-sm font-normal leading-snug"
+              >
                 {c.label}
               </Label>
             </li>
@@ -473,7 +554,9 @@ export function RegistrantDetail({
               </ul>
             </div>
           ) : (
-            <p className="text-sm text-emerald-800">All documents and cross-checks are complete. Ready to approve.</p>
+            <p className="text-sm text-emerald-800">
+              All documents and cross-checks are complete. Ready to approve.
+            </p>
           )}
           <div className="flex flex-col gap-3 rounded-lg bg-secondary/50 p-3 sm:flex-row sm:items-end">
             <Button
@@ -485,9 +568,17 @@ export function RegistrantDetail({
             </Button>
             <div className="flex-1 space-y-1.5">
               <Label htmlFor={`reason-${r.id}`}>Reason (required to reject)</Label>
-              <Input id={`reason-${r.id}`} value={reason} onChange={(e) => setReason(e.target.value)} />
+              <Input
+                id={`reason-${r.id}`}
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+              />
             </div>
-            <Button variant="outline" disabled={busy || r.status === "rejected"} onClick={() => review("rejected")}>
+            <Button
+              variant="outline"
+              disabled={busy || r.status === "rejected"}
+              onClick={() => review("rejected")}
+            >
               Reject
             </Button>
           </div>
@@ -514,7 +605,9 @@ export function RegistrantDetail({
                       </span>
                     </span>
                     <span className="flex items-center gap-2">
-                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${RELEASE_STYLE[b.status]}`}>
+                      <span
+                        className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${RELEASE_STYLE[b.status]}`}
+                      >
                         {RELEASE_LABEL[b.status]}
                       </span>
                       {b.status !== "released" && (
@@ -523,7 +616,11 @@ export function RegistrantDetail({
                         </Button>
                       )}
                       {b.status === "scheduled" && (
-                        <Button size="sm" variant="ghost" onClick={() => setReleaseStatus(b.id, "unclaimed")}>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setReleaseStatus(b.id, "unclaimed")}
+                        >
                           Unclaimed
                         </Button>
                       )}
@@ -539,7 +636,12 @@ export function RegistrantDetail({
                             id={`claimby-${b.id}`}
                             className={SELECT_CLASS}
                             value={claim.by}
-                            onChange={(e) => setClaim({ ...claim, by: e.target.value as "self" | "representative" })}
+                            onChange={(e) =>
+                              setClaim({
+                                ...claim,
+                                by: e.target.value as "self" | "representative",
+                              })
+                            }
                           >
                             <option value="self">The beneficiary</option>
                             <option value="representative">A representative</option>
@@ -560,7 +662,9 @@ export function RegistrantDetail({
                               <Input
                                 id={`claimrel-${b.id}`}
                                 value={claim.relationship}
-                                onChange={(e) => setClaim({ ...claim, relationship: e.target.value })}
+                                onChange={(e) =>
+                                  setClaim({ ...claim, relationship: e.target.value })
+                                }
                               />
                             </div>
                           </>
@@ -573,7 +677,10 @@ export function RegistrantDetail({
                           onCheckedChange={(v) => setClaim({ ...claim, idChecked: v === true })}
                           className="mt-0.5"
                         />
-                        <Label htmlFor={`claimid-${b.id}`} className="cursor-pointer text-sm font-normal leading-snug">
+                        <Label
+                          htmlFor={`claimid-${b.id}`}
+                          className="cursor-pointer text-sm font-normal leading-snug"
+                        >
                           {claim.by === "representative"
                             ? "I checked the beneficiary's original PWD/OSCA ID, the signed authorization letter, and the representative's valid ID."
                             : "I checked the beneficiary's original Taguig PWD / senior citizen ID."}
@@ -581,10 +688,16 @@ export function RegistrantDetail({
                       </div>
                       {claim.by === "representative" && (
                         <p className="text-xs text-muted-foreground">
-                          A verified authorization letter and representative ID must be on file in Documents above.
+                          A verified authorization letter and representative ID must be on file in
+                          Documents above.
                         </p>
                       )}
-                      <Button variant="gold" size="sm" disabled={busy} onClick={() => markReleased(b.id)}>
+                      <Button
+                        variant="gold"
+                        size="sm"
+                        disabled={busy}
+                        onClick={() => markReleased(b.id)}
+                      >
                         Confirm release
                       </Button>
                     </div>
@@ -649,7 +762,8 @@ export function RegistrantDetail({
           </form>
           <div className="flex flex-wrap items-center gap-3">
             <Button type="button" variant="outline" disabled={busy} onClick={scheduleAll}>
-              Schedule all {rel.year} {r.category === "pwd" ? "gifts (birthday, July, December)" : "birthday gift"}
+              Schedule all {rel.year}{" "}
+              {r.category === "pwd" ? "gifts (birthday, July, December)" : "birthday gift"}
             </Button>
             <p className="text-xs text-muted-foreground">
               {r.category === "pwd"

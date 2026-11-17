@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/select";
 import { PageHero } from "@/components/page-hero";
 import { Reveal } from "@/components/reveal";
+import { useConfirm } from "@/components/confirm-dialog";
+import { ReviewPanel } from "@/components/review-panel";
 import { getMyProfile } from "@/lib/profiles.functions";
 import { getSiteData } from "@/lib/settings.functions";
 import { submitRequest } from "@/lib/queue.functions";
@@ -78,6 +80,7 @@ function RequestPage() {
   const siteFn = useServerFn(getSiteData);
   const profileFn = useServerFn(getMyProfile);
   const submitFn = useServerFn(submitRequest);
+  const confirm = useConfirm();
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -91,6 +94,7 @@ function RequestPage() {
   const [busy, setBusy] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [submittedCode, setSubmittedCode] = useState("");
+  const [reviewing, setReviewing] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -126,12 +130,27 @@ function RequestPage() {
       ? `Describe the matter in at least ${DETAILS_MIN_LENGTH} characters.`
       : "";
 
-  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+  // Step 1: check the form, then show the review page.
+  const goToReview = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setAttempted(true);
     setSubmitError("");
     if (!service) return;
     if (needsDetails && details.trim().length < DETAILS_MIN_LENGTH) return;
+    setReviewing(true);
+    window.scrollTo({ top: 0 });
+  };
+
+  // Step 2: ask once more, then send.
+  const submit = async () => {
+    if (!service) return;
+    const ok = await confirm({
+      title: "Do you want to submit this request?",
+      description: "The barangay will receive it and you will get a reference code.",
+      confirmLabel: "Yes, submit",
+    });
+    if (!ok) return;
+    setSubmitError("");
     setBusy(true);
     try {
       const result = await submitFn({ data: { service_id: service.id, details: details.trim() } });
@@ -149,6 +168,7 @@ function RequestPage() {
     setAttempted(false);
     setSubmitError("");
     setSubmittedCode("");
+    setReviewing(false);
   };
 
   const hero = (
@@ -252,6 +272,36 @@ function RequestPage() {
     .filter(Boolean)
     .join(", ");
 
+  if (reviewing && service) {
+    return (
+      <div>
+        {hero}
+        <div className="mx-auto max-w-3xl px-4 py-12">
+          <ReviewPanel
+            intro="Check your request. Nothing is sent until you press Submit request."
+            rows={[
+              { label: "Service", value: service.name },
+              { label: "Fee", value: formatFee(service.fee) },
+              { label: needsDetails ? "Matter" : "Notes", value: details.trim() },
+              { label: "Resident", value: fullName },
+              { label: "Address", value: address },
+              { label: "Contact", value: profile.contact_number },
+            ]}
+            busy={busy}
+            error={submitError}
+            submitLabel="Submit request"
+            busyLabel="Filing request…"
+            onBack={() => {
+              setSubmitError("");
+              setReviewing(false);
+            }}
+            onSubmit={() => void submit()}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       {hero}
@@ -259,7 +309,7 @@ function RequestPage() {
         as="section"
         className="mx-auto grid max-w-5xl gap-10 px-4 py-12 lg:grid-cols-[1.1fr_.9fr]"
       >
-        <form onSubmit={(event) => void submit(event)} noValidate className="space-y-6">
+        <form onSubmit={goToReview} noValidate className="space-y-6">
           <div className="space-y-2">
             <Label htmlFor="request-service">Service</Label>
             <Select value={serviceId} onValueChange={setServiceId}>
@@ -320,9 +370,7 @@ function RequestPage() {
               {submitError}
             </p>
           )}
-          <Button variant="gold" disabled={busy}>
-            {busy ? "Filing request…" : "File request"}
-          </Button>
+          <Button variant="gold">Review request</Button>
         </form>
 
         <aside className="space-y-6">

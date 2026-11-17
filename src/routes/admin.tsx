@@ -20,6 +20,8 @@ const SECTIONS = [
   { to: "/admin/requests", label: "Requests" },
   { to: "/admin/problems", label: "Problems" },
   { to: "/admin/registry", label: "PWD / Senior" },
+  { to: "/admin/announcements", label: "Announcements" },
+  { to: "/admin/settings", label: "Settings" },
   { to: "/admin/reports", label: "Reports" },
 ] as const;
 

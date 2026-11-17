@@ -28,10 +28,12 @@ import { Route as TermsRouteImport } from './routes/terms'
 import { Route as TrackRouteImport } from './routes/track'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminAccountsRouteImport } from './routes/admin.accounts'
+import { Route as AdminAnnouncementsRouteImport } from './routes/admin.announcements'
 import { Route as AdminProblemsRouteImport } from './routes/admin.problems'
 import { Route as AdminRegistryRouteImport } from './routes/admin.registry'
 import { Route as AdminReportsRouteImport } from './routes/admin.reports'
 import { Route as AdminRequestsRouteImport } from './routes/admin.requests'
+import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -128,6 +130,11 @@ const AdminAccountsRoute = AdminAccountsRouteImport.update({
   path: '/accounts',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminAnnouncementsRoute = AdminAnnouncementsRouteImport.update({
+  id: '/announcements',
+  path: '/announcements',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminProblemsRoute = AdminProblemsRouteImport.update({
   id: '/problems',
   path: '/problems',
@@ -146,6 +153,11 @@ const AdminReportsRoute = AdminReportsRouteImport.update({
 const AdminRequestsRoute = AdminRequestsRouteImport.update({
   id: '/requests',
   path: '/requests',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSettingsRoute = AdminSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => AdminRoute,
 } as any)
 
@@ -168,10 +180,12 @@ export interface FileRoutesByFullPath {
   '/terms': typeof TermsRoute
   '/track': typeof TrackRoute
   '/admin/accounts': typeof AdminAccountsRoute
+  '/admin/announcements': typeof AdminAnnouncementsRoute
   '/admin/problems': typeof AdminProblemsRoute
   '/admin/registry': typeof AdminRegistryRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/requests': typeof AdminRequestsRoute
+  '/admin/settings': typeof AdminSettingsRoute
   '/admin/': typeof AdminIndexRoute
 }
 export interface FileRoutesByTo {
@@ -192,10 +206,12 @@ export interface FileRoutesByTo {
   '/terms': typeof TermsRoute
   '/track': typeof TrackRoute
   '/admin/accounts': typeof AdminAccountsRoute
+  '/admin/announcements': typeof AdminAnnouncementsRoute
   '/admin/problems': typeof AdminProblemsRoute
   '/admin/registry': typeof AdminRegistryRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/requests': typeof AdminRequestsRoute
+  '/admin/settings': typeof AdminSettingsRoute
   '/admin': typeof AdminIndexRoute
 }
 export interface FileRoutesById {
@@ -218,10 +234,12 @@ export interface FileRoutesById {
   '/terms': typeof TermsRoute
   '/track': typeof TrackRoute
   '/admin/accounts': typeof AdminAccountsRoute
+  '/admin/announcements': typeof AdminAnnouncementsRoute
   '/admin/problems': typeof AdminProblemsRoute
   '/admin/registry': typeof AdminRegistryRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/requests': typeof AdminRequestsRoute
+  '/admin/settings': typeof AdminSettingsRoute
   '/admin/': typeof AdminIndexRoute
 }
 export interface FileRouteTypes {
@@ -245,10 +263,12 @@ export interface FileRouteTypes {
     | '/terms'
     | '/track'
     | '/admin/accounts'
+    | '/admin/announcements'
     | '/admin/problems'
     | '/admin/registry'
     | '/admin/reports'
     | '/admin/requests'
+    | '/admin/settings'
     | '/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -269,10 +289,12 @@ export interface FileRouteTypes {
     | '/terms'
     | '/track'
     | '/admin/accounts'
+    | '/admin/announcements'
     | '/admin/problems'
     | '/admin/registry'
     | '/admin/reports'
     | '/admin/requests'
+    | '/admin/settings'
     | '/admin'
   id:
     | '__root__'
@@ -294,10 +316,12 @@ export interface FileRouteTypes {
     | '/terms'
     | '/track'
     | '/admin/accounts'
+    | '/admin/announcements'
     | '/admin/problems'
     | '/admin/registry'
     | '/admin/reports'
     | '/admin/requests'
+    | '/admin/settings'
     | '/admin/'
   fileRoutesById: FileRoutesById
 }
@@ -456,6 +480,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAccountsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/announcements': {
+      id: '/admin/announcements'
+      path: '/announcements'
+      fullPath: '/admin/announcements'
+      preLoaderRoute: typeof AdminAnnouncementsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/problems': {
       id: '/admin/problems'
       path: '/problems'
@@ -484,24 +515,35 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRequestsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/settings': {
+      id: '/admin/settings'
+      path: '/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AdminSettingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
   }
 }
 
 interface AdminRouteChildren {
   AdminAccountsRoute: typeof AdminAccountsRoute
+  AdminAnnouncementsRoute: typeof AdminAnnouncementsRoute
   AdminProblemsRoute: typeof AdminProblemsRoute
   AdminRegistryRoute: typeof AdminRegistryRoute
   AdminReportsRoute: typeof AdminReportsRoute
   AdminRequestsRoute: typeof AdminRequestsRoute
+  AdminSettingsRoute: typeof AdminSettingsRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminAccountsRoute: AdminAccountsRoute,
+  AdminAnnouncementsRoute: AdminAnnouncementsRoute,
   AdminProblemsRoute: AdminProblemsRoute,
   AdminRegistryRoute: AdminRegistryRoute,
   AdminReportsRoute: AdminReportsRoute,
   AdminRequestsRoute: AdminRequestsRoute,
+  AdminSettingsRoute: AdminSettingsRoute,
   AdminIndexRoute: AdminIndexRoute,
 }
 

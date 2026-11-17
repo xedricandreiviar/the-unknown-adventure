@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useConfirm } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -96,6 +97,7 @@ const NEXT_STEP: Partial<
 
 function RequestsPage() {
   const listFn = useServerFn(adminListRequests);
+  const confirm = useConfirm();
   const updateFn = useServerFn(adminUpdateRequest);
 
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
@@ -156,6 +158,15 @@ function RequestsPage() {
     done: string,
     why?: string,
   ) => {
+    // Rejecting already asks for a reason in its own box.
+    if (why === undefined) {
+      const ok = await confirm({
+        title: `Do you want to update request ${item.code}?`,
+        description: `It will be marked as ${status.replace(/_/g, " ")}. The resident is notified.`,
+        confirmLabel: "Yes, update",
+      });
+      if (!ok) return;
+    }
     setBusy(true);
     setError("");
     setMessage("");

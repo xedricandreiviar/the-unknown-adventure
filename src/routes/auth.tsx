@@ -10,6 +10,7 @@ import { Reveal } from "@/components/reveal";
 import { useConfirm } from "@/components/confirm-dialog";
 import { ReviewPanel } from "@/components/review-panel";
 import { SITE } from "@/lib/site";
+import { DISABILITY_TYPES } from "@/lib/registry";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -373,14 +374,26 @@ function AuthPage() {
                           onChange={(e) => update("pwd_id_number", e.target.value)}
                           required
                         />
+                        <p className="text-xs text-muted-foreground">
+                          Format: RR-PPMM-BBB-NNNNNNN (region, province + city/municipality,
+                          barangay, 7-digit number). Example: 13-5416-000-0000001
+                        </p>
                       </div>
                       <div className="space-y-1.5">
-                        <Label htmlFor="pwd_disability_type">Disability type</Label>
-                        <Input
+                        <Label htmlFor="pwd_disability_type">Type of disability</Label>
+                        <select
                           id="pwd_disability_type"
                           value={fields.pwd_disability_type}
                           onChange={(e) => update("pwd_disability_type", e.target.value)}
-                        />
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        >
+                          <option value="">Select…</option>
+                          {DISABILITY_TYPES.map((type) => (
+                            <option key={type} value={type}>
+                              {type}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     </div>
                   )}

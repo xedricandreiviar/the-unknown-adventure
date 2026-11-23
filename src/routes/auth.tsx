@@ -5,6 +5,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { PageHero } from "@/components/page-hero";
 import { Reveal } from "@/components/reveal";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -116,11 +123,15 @@ function AuthPage() {
           if (profileError) throw profileError;
         }
         setReviewing(false);
-        setNotice(
-          data.session
-            ? "Account created. Your application is pending barangay approval."
-            : "Account created. Check your email to confirm, then sign in and upload your supporting ID in My Account. Your application is pending approval.",
-        );
+        // If Supabase returned a session the user is already signed in — go straight to account.
+        // If email confirmation is required, data.session is null — show the notice instead.
+        if (data.session) {
+          await navigate({ to: "/account", replace: true });
+        } else {
+          setNotice(
+            "Account created. Check your email to confirm, then sign in and upload your supporting ID in My Account. Your application is pending approval.",
+          );
+        }
       }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Something went wrong. Please try again.");
@@ -381,19 +392,22 @@ function AuthPage() {
                       </div>
                       <div className="space-y-1.5">
                         <Label htmlFor="pwd_disability_type">Type of disability</Label>
-                        <select
-                          id="pwd_disability_type"
+                        {/* Radix Select renders in a portal — always drops down correctly */}
+                        <Select
                           value={fields.pwd_disability_type}
-                          onChange={(e) => update("pwd_disability_type", e.target.value)}
-                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          onValueChange={(val) => update("pwd_disability_type", val)}
                         >
-                          <option value="">Select…</option>
-                          {DISABILITY_TYPES.map((type) => (
-                            <option key={type} value={type}>
-                              {type}
-                            </option>
-                          ))}
-                        </select>
+                          <SelectTrigger id="pwd_disability_type" className="w-full">
+                            <SelectValue placeholder="Select…" />
+                          </SelectTrigger>
+                          <SelectContent position="popper" side="bottom" sideOffset={4} avoidCollisions={false}>
+                            {DISABILITY_TYPES.map((type) => (
+                              <SelectItem key={type} value={type}>
+                                {type}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
                   )}

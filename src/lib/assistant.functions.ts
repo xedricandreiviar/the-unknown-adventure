@@ -14,7 +14,7 @@ import type { Database } from "@/integrations/supabase/types";
  *   AI_MODEL     defaults to gemini-2.5-flash
  */
 const DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai";
-const DEFAULT_MODEL = "gemini-2.5-flash";
+const DEFAULT_MODEL = "gemini-3.8-flash";
 
 const MAX_QUESTION = 500;
 const MAX_HISTORY = 8;
@@ -129,6 +129,7 @@ export const askAssistant = createServerFn({ method: "POST" })
         signal: AbortSignal.timeout(25_000),
       });
       if (!response.ok) {
+        console.error("AI error", response.status, await response.text());
         const busy = response.status === 429;
         return {
           ok: false as const,

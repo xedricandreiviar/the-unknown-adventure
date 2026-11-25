@@ -14,6 +14,7 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
 } from "@/lib/notifications.functions";
+import { supabase } from "@/integrations/supabase/client";
 
 export type AlertCounts = { accounts: number; requests: number; problems: number };
 
@@ -24,6 +25,8 @@ const REFRESH_MS = 30_000;
  * Keeps two things fresh for the admin panel:
  * - the counts of work still waiting (red badges on the tabs), and
  * - the admin's own notifications, which can be opened and marked as read.
+ *
+ * Uses Supabase Realtime for instant updates + a 30 s polling fallback.
  */
 export function useAdminAlerts() {
   const alertsFn = useServerFn(adminGetAlerts);
@@ -47,13 +50,45 @@ export function useAdminAlerts() {
   }, [alertsFn, listFn]);
 
   useEffect(() => {
+    // Initial load
     void refresh();
+
+    // Polling fallback every 30 s
     const timer = window.setInterval(() => void refresh(), REFRESH_MS);
+
+    // Refresh on tab focus
     const onFocus = () => void refresh();
     window.addEventListener("focus", onFocus);
+
+    // Realtime subscriptions — refresh instantly when relevant tables change
+    const channel = supabase
+      .channel("admin-alerts-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "profiles" },
+        () => void refresh(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "service_requests" },
+        () => void refresh(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "problem_reports" },
+        () => void refresh(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "notifications" },
+        () => void refresh(),
+      )
+      .subscribe();
+
     return () => {
       window.clearInterval(timer);
       window.removeEventListener("focus", onFocus);
+      void supabase.removeChannel(channel);
     };
   }, [refresh]);
 

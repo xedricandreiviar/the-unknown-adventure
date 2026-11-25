@@ -47,10 +47,13 @@ export function DocumentsPanel({
   adminId?: string;
   onChanged?: () => void;
 }) {
-  const isAdmin = Boolean(adminId);
-  const representative = r.applicant_type === "representative";
+   const isAdmin = Boolean(adminId);
+  const representative =
+    r.applicant_type === "representative" || (isAdmin && r.status === "approved");
   const groups = requiredDocGroups(r.category, representative);
-  const canUpload = r.status === "pending" && (!isAdmin || r.source === "walk_in");
+  const canUpload =
+    (r.status === "pending" && (!isAdmin || r.source === "walk_in")) ||
+    (isAdmin && r.status === "approved");
 
   const [docs, setDocs] = useState<RegistrantDocument[]>([]);
   const [msg, setMsg] = useState<string | null>(null);

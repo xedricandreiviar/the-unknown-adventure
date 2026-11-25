@@ -30,8 +30,32 @@ import {
 const SELECT_CLASS =
   "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs focus-visible:outline-2 focus-visible:outline-gold-deep";
 
-const PH_MOBILE = /^(09|\+639)\d{9}$/;
+// Mobile numbers: exactly 11 digits, like 09171234567 (digits only).
+const PH_MOBILE = /^09\d{9}$/;
+const digitsOnly = (v: string) => v.replace(/\D/g, "").slice(0, 11);
+
+// Names: letters, spaces and . - ' only. Numbers and other symbols are removed as you type.
+const NAME_RE = /^[\p{L}\p{M}][\p{L}\p{M} .'’-]*$/u;
+const NAME_ERROR = "Names can only have letters, spaces and . - ' (no numbers).";
+const cleanName = (v: string) => v.replace(/[^\p{L}\p{M} .'’-]/gu, "");
+
 const FILE_ACCEPT = "image/jpeg,image/png,application/pdf,.jpg,.jpeg,.png,.pdf";
+
+// Stops the browser from suggesting saved names, addresses and phone numbers on this form (privacy,
+// especially on shared barangay computers). Chrome ignores "off" on address fields, so an
+// unrecognized value is used on the inputs; the form itself also has autoComplete="off".
+const NO_AUTOFILL = "nope";
+
+// Chrome also remembers what was typed into a field (by the field's name) and offers it again, and
+// the unrecognized autoComplete value above does not stop that. A name that changes on every page
+// load never matches the old entries, so no old suggestions appear.
+function useFieldSalt(): string {
+  const [salt, setSalt] = useState("");
+  useEffect(() => {
+    setSalt(Math.random().toString(36).slice(2, 10));
+  }, []);
+  return salt;
+}
 
 type FormState = {
   category: RegistryCategory;
@@ -39,11 +63,14 @@ type FormState = {
   repName: string;
   repRelationship: string;
   repContact: string;
-  fullName: string;
+  firstName: string;
+  middleName: string;
+  lastName: string;
   birthDate: string;
   sex: "" | "Male" | "Female";
   civilStatus: string;
-  address: string;
+  street: string;
+  purok: string;
   contactNumber: string;
   disabilityType: string;
   idNumber: string;
@@ -59,11 +86,14 @@ const EMPTY: FormState = {
   repName: "",
   repRelationship: "",
   repContact: "",
-  fullName: "",
+  firstName: "",
+  middleName: "",
+  lastName: "",
   birthDate: "",
   sex: "",
   civilStatus: "",
-  address: "",
+  street: "",
+  purok: "",
   contactNumber: "",
   disabilityType: "",
   idNumber: "",
@@ -73,19 +103,32 @@ const EMPTY: FormState = {
   consent: false,
 };
 
+// The database keeps one full name and one address, so the separate boxes are joined for saving.
+const composeName = (f: FormState) =>
+  [f.firstName, f.middleName, f.lastName]
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(" ");
+const composeAddress = (f: FormState) => `${f.street.trim()}, ${f.purok.trim()}, Wawa, Taguig City`;
+
 type PickedDoc = { type: DocType; file: File | null; file2?: File | null };
 type Check = { state: "ok" | "warn" | "todo"; text: string };
 
 function validate(f: FormState): string | null {
   if (f.applicantType === "representative") {
     if (f.repName.trim().length < 2) return "Please enter the representative's full name.";
+    if (!NAME_RE.test(f.repName.trim())) return NAME_ERROR;
     if (!f.repRelationship.trim())
       return "Please enter the representative's relationship to the beneficiary.";
     if (!PH_MOBILE.test(f.repContact.replace(/[\s-]/g, ""))) {
-      return "Enter the representative's mobile number, like 09171234567.";
+      return "The representative's mobile number must be exactly 11 digits, like 09171234567.";
     }
   }
-  if (f.fullName.trim().length < 2) return "Please enter the beneficiary's full name.";
+  if (!f.firstName.trim()) return "Please enter the beneficiary's first name.";
+  if (!f.lastName.trim()) return "Please enter the beneficiary's last name.";
+  for (const part of [f.firstName, f.middleName, f.lastName]) {
+    if (part.trim() && !NAME_RE.test(part.trim())) return NAME_ERROR;
+  }
   if (!f.birthDate) return "Please enter the date of birth.";
   const today = new Date().toISOString().slice(0, 10);
   if (f.birthDate >= today) return "Date of birth must be in the past.";
@@ -93,9 +136,10 @@ function validate(f: FormState): string | null {
     return "Senior citizens must be at least 60 years old.";
   }
   if (!f.sex) return "Please select the sex.";
-  if (f.address.trim().length < 5) return "Please enter the complete address.";
+  if (f.street.trim().length < 3) return "Please enter the street.";
+  if (!f.purok.trim()) return "Please enter the purok.";
   if (f.contactNumber.trim() && !PH_MOBILE.test(f.contactNumber.replace(/[\s-]/g, ""))) {
-    return "Contact number should look like 09171234567.";
+    return "Contact number must be exactly 11 digits, like 09171234567.";
   }
   if (f.category === "pwd" && !f.disabilityType) return "Please select the type of disability.";
   if (f.category === "pwd" && f.idNumber.trim() && !f.idExpiry) {
@@ -127,6 +171,8 @@ export function RegistrationForm({
   blockedCategories?: RegistryCategory[];
 }) {
   const confirm = useConfirm();
+  const salt = useFieldSalt();
+  const nm = (field: string) => `${field}-${salt}`;
   const [reviewing, setReviewing] = useState(false);
   const [f, setF] = useState<FormState>(EMPTY);
   const [docs, setDocs] = useState<Record<string, PickedDoc>>({});
@@ -168,14 +214,12 @@ export function RegistrationForm({
     );
   }
   checks.push(
-    f.address.trim() === ""
-      ? { state: "todo", text: "Enter the home address (it should be in Wawa)." }
-      : /wawa/i.test(f.address)
-        ? { state: "ok", text: "The address is in Wawa." }
-        : {
-            state: "warn",
-            text: "The address does not mention Wawa. Staff will check the proof of residence carefully.",
-          },
+    f.street.trim() === "" || f.purok.trim() === ""
+      ? { state: "todo", text: "Enter the street and purok (the address is in Barangay Wawa)." }
+      : {
+          state: "ok",
+          text: "The address is in Barangay Wawa. Staff compare it with the proof of residence.",
+        },
   );
   if (f.category === "pwd" && f.idExpiry) {
     checks.push(
@@ -277,11 +321,11 @@ export function RegistrationForm({
     const isSenior = f.category === "senior";
     const base = {
       category: f.category,
-      full_name: f.fullName.trim(),
+      full_name: composeName(f),
       birth_date: f.birthDate,
       sex: f.sex as "Male" | "Female",
       civil_status: f.civilStatus || null,
-      address: f.address.trim(),
+      address: composeAddress(f),
       contact_number: f.contactNumber.trim() || null,
       disability_type: isPwd ? f.disabilityType : null,
       id_number: f.idNumber.trim() || null,
@@ -431,11 +475,11 @@ export function RegistrationForm({
             { label: "Rep. contact", value: f.repContact.trim() },
           ]
         : []),
-      { label: "Full name", value: f.fullName.trim() },
+      { label: "Full name", value: composeName(f) },
       { label: "Date of birth", value: formatDate(f.birthDate) },
       { label: "Sex", value: f.sex },
       { label: "Civil status", value: f.civilStatus },
-      { label: "Address", value: f.address.trim() },
+      { label: "Address", value: composeAddress(f) },
       { label: "Contact number", value: f.contactNumber.trim() },
       ...(f.category === "pwd"
         ? [
@@ -470,6 +514,7 @@ export function RegistrationForm({
   return (
     <form
       onSubmit={goToReview}
+      autoComplete="off"
       className="space-y-5 rounded-xl border border-border bg-card p-6"
       noValidate
     >
@@ -535,8 +580,10 @@ export function RegistrationForm({
             <Label htmlFor="repName">Representative's full name</Label>
             <Input
               id="repName"
+              name={nm("repName")}
+              autoComplete={NO_AUTOFILL}
               value={f.repName}
-              onChange={(e) => set("repName", e.target.value)}
+              onChange={(e) => set("repName", cleanName(e.target.value))}
               required
             />
           </div>
@@ -544,6 +591,8 @@ export function RegistrationForm({
             <Label htmlFor="repRelationship">Relationship to the beneficiary</Label>
             <Input
               id="repRelationship"
+              name={nm("repRelationship")}
+              autoComplete={NO_AUTOFILL}
               placeholder="e.g. daughter, caregiver"
               value={f.repRelationship}
               onChange={(e) => set("repRelationship", e.target.value)}
@@ -554,10 +603,12 @@ export function RegistrationForm({
             <Label htmlFor="repContact">Representative's mobile number</Label>
             <Input
               id="repContact"
+              name={nm("repContact")}
+              autoComplete={NO_AUTOFILL}
               inputMode="tel"
               placeholder="09171234567"
               value={f.repContact}
-              onChange={(e) => set("repContact", e.target.value)}
+              onChange={(e) => set("repContact", digitsOnly(e.target.value))}
               required
             />
           </div>
@@ -565,13 +616,38 @@ export function RegistrationForm({
       )}
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label htmlFor="fullName">Beneficiary's full name (as on the ID)</Label>
+        <div className="space-y-1.5">
+          <Label htmlFor="firstName">First name</Label>
           <Input
-            id="fullName"
-            autoComplete={isRep ? "off" : "name"}
-            value={f.fullName}
-            onChange={(e) => set("fullName", e.target.value)}
+            id="firstName"
+            name={nm("firstName")}
+            autoComplete={NO_AUTOFILL}
+            maxLength={60}
+            value={f.firstName}
+            onChange={(e) => set("firstName", cleanName(e.target.value))}
+            required
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="middleName">Middle name (optional)</Label>
+          <Input
+            id="middleName"
+            name={nm("middleName")}
+            autoComplete={NO_AUTOFILL}
+            maxLength={60}
+            value={f.middleName}
+            onChange={(e) => set("middleName", cleanName(e.target.value))}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="lastName">Last name</Label>
+          <Input
+            id="lastName"
+            name={nm("lastName")}
+            autoComplete={NO_AUTOFILL}
+            maxLength={60}
+            value={f.lastName}
+            onChange={(e) => set("lastName", cleanName(e.target.value))}
             required
           />
         </div>
@@ -579,6 +655,8 @@ export function RegistrationForm({
           <Label htmlFor="birthDate">Date of birth</Label>
           <Input
             id="birthDate"
+            name={nm("birthDate")}
+            autoComplete={NO_AUTOFILL}
             type="date"
             max={new Date().toISOString().slice(0, 10)}
             value={f.birthDate}
@@ -622,29 +700,49 @@ export function RegistrationForm({
           </select>
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="contactNumber">Beneficiary's contact number (optional)</Label>
+          <Label htmlFor="street">Street</Label>
           <Input
-            id="contactNumber"
-            inputMode="tel"
-            placeholder="09171234567"
-            value={f.contactNumber}
-            onChange={(e) => set("contactNumber", e.target.value)}
-          />
-        </div>
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label htmlFor="address">Home address in Wawa</Label>
-          <Input
-            id="address"
-            autoComplete="street-address"
-            placeholder="House/Lot no., Street, Wawa, Taguig City"
-            value={f.address}
-            onChange={(e) => set("address", e.target.value)}
+            id="street"
+            name={nm("street")}
+            autoComplete={NO_AUTOFILL}
+            maxLength={120}
+            placeholder="House/Lot no. and street"
+            value={f.street}
+            onChange={(e) => set("street", e.target.value)}
             required
           />
         </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="purok">Purok</Label>
+          <Input
+            id="purok"
+            name={nm("purok")}
+            autoComplete={NO_AUTOFILL}
+            maxLength={60}
+            placeholder="e.g. Purok 3"
+            value={f.purok}
+            onChange={(e) => set("purok", e.target.value)}
+            required
+          />
+          <p className="text-xs text-muted-foreground">Barangay Wawa, Taguig City</p>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="contactNumber">Beneficiary's contact number (optional)</Label>
+          <Input
+            id="contactNumber"
+            name={nm("contactNumber")}
+            autoComplete={NO_AUTOFILL}
+            inputMode="numeric"
+            maxLength={11}
+            placeholder="09171234567"
+            value={f.contactNumber}
+            onChange={(e) => set("contactNumber", digitsOnly(e.target.value))}
+          />
+          <p className="text-xs text-muted-foreground">11 digits, numbers only.</p>
+        </div>
 
         {f.category === "pwd" && (
-          <div className="space-y-1.5 sm:col-span-2">
+          <div className="space-y-1.5">
             <Label htmlFor="disabilityType">Type of disability</Label>
             <select
               id="disabilityType"
@@ -670,6 +768,8 @@ export function RegistrationForm({
           </Label>
           <Input
             id="idNumber"
+            name={nm("idNumber")}
+            autoComplete={NO_AUTOFILL}
             value={f.idNumber}
             onChange={(e) => set("idNumber", e.target.value)}
           />
@@ -679,6 +779,8 @@ export function RegistrationForm({
             <Label htmlFor="idExpiry">PWD ID expiry date</Label>
             <Input
               id="idExpiry"
+              name={nm("idExpiry")}
+              autoComplete={NO_AUTOFILL}
               type="date"
               value={f.idExpiry}
               onChange={(e) => set("idExpiry", e.target.value)}
@@ -690,7 +792,7 @@ export function RegistrationForm({
 
       {f.category === "senior" && (
         <fieldset className="space-y-3 rounded-lg bg-secondary/50 p-4">
-          <legend className="px-1 text-sm font-medium">Social pension</legend>
+          <legend className="float-left mb-3 w-full text-sm font-medium [&+*]:clear-both">Social pension</legend>
           <div className="flex items-start gap-3">
             <Checkbox
               id="pensionApplicant"

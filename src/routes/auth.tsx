@@ -5,11 +5,19 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { PageHero } from "@/components/page-hero";
 import { Reveal } from "@/components/reveal";
 import { useConfirm } from "@/components/confirm-dialog";
 import { ReviewPanel } from "@/components/review-panel";
 import { SITE } from "@/lib/site";
+import { DISABILITY_TYPES } from "@/lib/registry";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -115,11 +123,15 @@ function AuthPage() {
           if (profileError) throw profileError;
         }
         setReviewing(false);
-        setNotice(
-          data.session
-            ? "Account created. Your application is pending barangay approval."
-            : "Account created. Check your email to confirm, then sign in and upload your supporting ID in My Account. Your application is pending approval.",
-        );
+        // If Supabase returned a session the user is already signed in — go straight to account.
+        // If email confirmation is required, data.session is null — show the notice instead.
+        if (data.session) {
+          await navigate({ to: "/account", replace: true });
+        } else {
+          setNotice(
+            "Account created. Check your email to confirm, then sign in and upload your supporting ID in My Account. Your application is pending approval.",
+          );
+        }
       }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Something went wrong. Please try again.");
@@ -373,14 +385,29 @@ function AuthPage() {
                           onChange={(e) => update("pwd_id_number", e.target.value)}
                           required
                         />
+                        <p className="text-xs text-muted-foreground">
+                          Format: RR-PPMM-BBB-NNNNNNN (region, province + city/municipality,
+                          barangay, 7-digit number). Example: 13-5416-000-0000001
+                        </p>
                       </div>
                       <div className="space-y-1.5">
-                        <Label htmlFor="pwd_disability_type">Disability type</Label>
-                        <Input
-                          id="pwd_disability_type"
+                        <Label htmlFor="pwd_disability_type">Type of disability</Label>
+                        {/* Radix Select renders in a portal — always drops down correctly */}
+                        <Select
                           value={fields.pwd_disability_type}
-                          onChange={(e) => update("pwd_disability_type", e.target.value)}
-                        />
+                          onValueChange={(val) => update("pwd_disability_type", val)}
+                        >
+                          <SelectTrigger id="pwd_disability_type" className="w-full">
+                            <SelectValue placeholder="Select…" />
+                          </SelectTrigger>
+                          <SelectContent position="popper" side="bottom" sideOffset={4} avoidCollisions={false}>
+                            {DISABILITY_TYPES.map((type) => (
+                              <SelectItem key={type} value={type}>
+                                {type}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
                   )}

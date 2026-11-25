@@ -1,20 +1,19 @@
 -- =============================================================================
 -- Barangay Wawa United — Base Schema
--- Generated from src/integrations/supabase/types.ts
 -- Run this FIRST on your new Supabase project, before the numbered migrations.
--- Go to: Supabase Dashboard → SQL Editor → paste this → Run
+-- Supabase Dashboard → SQL Editor → New query → paste all → Run
 -- =============================================================================
 
 -- ---------------------------------------------------------------------------
--- ENUMS
+-- 1. ENUMS  (must come before tables that reference them)
 -- ---------------------------------------------------------------------------
 
 do $$ begin
-  create type public.account_status as enum ('pending', 'approved', 'rejected', 'suspended');
+  create type public.app_role as enum ('admin', 'resident');
 exception when duplicate_object then null; end $$;
 
 do $$ begin
-  create type public.app_role as enum ('admin', 'resident');
+  create type public.account_status as enum ('pending', 'approved', 'rejected', 'suspended');
 exception when duplicate_object then null; end $$;
 
 do $$ begin
@@ -34,7 +33,70 @@ do $$ begin
 exception when duplicate_object then null; end $$;
 
 -- ---------------------------------------------------------------------------
--- PROFILES
+-- 2. USER ROLES + has_role()  (must come before every table that uses it in RLS)
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.user_roles (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  role public.app_role not null,
+  unique (user_id, role)
+);
+
+alter table public.user_roles enable row level security;
+
+-- has_role() must be created BEFORE any RLS policy that calls it
+create or replace function public.has_role(_user_id uuid, _role public.app_role)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.user_roles where user_id = _user_id and role = _role
+  );
+$$;
+
+create or replace function public.is_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select public.has_role(auth.uid(), 'admin');
+$$;
+
+drop policy if exists "Users read own roles" on public.user_roles;
+create policy "Users read own roles" on public.user_roles
+  for select to authenticated using (user_id = auth.uid());
+
+drop policy if exists "Admins manage roles" on public.user_roles;
+create policy "Admins manage roles" on public.user_roles
+  for all to authenticated
+  using (public.has_role(auth.uid(), 'admin'))
+  with check (public.has_role(auth.uid(), 'admin'));
+
+grant select, insert, update, delete on public.user_roles to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 3. SHARED TRIGGER FUNCTION (updated_at)
+-- ---------------------------------------------------------------------------
+
+create or replace function public.set_updated_at()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  new.updated_at := now();
+  return new;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- 4. PROFILES
 -- ---------------------------------------------------------------------------
 
 create table if not exists public.profiles (
@@ -109,73 +171,13 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
--- Updated_at trigger
-create or replace function public.set_updated_at()
-returns trigger
-language plpgsql
-set search_path = public
-as $$
-begin
-  new.updated_at := now();
-  return new;
-end;
-$$;
-
 drop trigger if exists profiles_updated_at on public.profiles;
 create trigger profiles_updated_at
   before update on public.profiles
   for each row execute function public.set_updated_at();
 
 -- ---------------------------------------------------------------------------
--- USER ROLES  (also created in migration 20261104 — that migration uses
--- "if not exists" so running both is safe)
--- ---------------------------------------------------------------------------
-
-create table if not exists public.user_roles (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users (id) on delete cascade,
-  role public.app_role not null,
-  unique (user_id, role)
-);
-
-alter table public.user_roles enable row level security;
-
-create or replace function public.has_role(_user_id uuid, _role public.app_role)
-returns boolean
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select exists (
-    select 1 from public.user_roles where user_id = _user_id and role = _role
-  );
-$$;
-
-create or replace function public.is_admin()
-returns boolean
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select public.has_role(auth.uid(), 'admin');
-$$;
-
-drop policy if exists "Users read own roles" on public.user_roles;
-create policy "Users read own roles" on public.user_roles
-  for select to authenticated using (user_id = auth.uid());
-
-drop policy if exists "Admins manage roles" on public.user_roles;
-create policy "Admins manage roles" on public.user_roles
-  for all to authenticated
-  using (public.has_role(auth.uid(), 'admin'))
-  with check (public.has_role(auth.uid(), 'admin'));
-
-grant select, insert, update, delete on public.user_roles to authenticated;
-
--- ---------------------------------------------------------------------------
--- SERVICES
+-- 5. SERVICES
 -- ---------------------------------------------------------------------------
 
 create table if not exists public.services (
@@ -205,7 +207,7 @@ grant select on public.services to anon, authenticated;
 grant insert, update, delete on public.services to authenticated;
 
 -- ---------------------------------------------------------------------------
--- SERVICE REQUESTS
+-- 6. SERVICE REQUESTS
 -- ---------------------------------------------------------------------------
 
 create table if not exists public.service_requests (
@@ -244,7 +246,7 @@ create trigger service_requests_updated_at
   for each row execute function public.set_updated_at();
 
 -- ---------------------------------------------------------------------------
--- COURT BLOCKS
+-- 7. COURT BLOCKS
 -- ---------------------------------------------------------------------------
 
 create table if not exists public.court_blocks (
@@ -272,7 +274,7 @@ grant select on public.court_blocks to anon, authenticated;
 grant insert, update, delete on public.court_blocks to authenticated;
 
 -- ---------------------------------------------------------------------------
--- COURT RESERVATIONS
+-- 8. COURT RESERVATIONS
 -- ---------------------------------------------------------------------------
 
 create table if not exists public.court_reservations (
@@ -311,7 +313,6 @@ create trigger court_reservations_updated_at
   before update on public.court_reservations
   for each row execute function public.set_updated_at();
 
--- Court slot status helper
 create or replace function public.court_slot_status(p_date date, p_slot text)
 returns text
 language sql
@@ -335,7 +336,7 @@ $$;
 grant execute on function public.court_slot_status(date, text) to anon, authenticated;
 
 -- ---------------------------------------------------------------------------
--- ANNOUNCEMENTS
+-- 9. ANNOUNCEMENTS
 -- ---------------------------------------------------------------------------
 
 create table if not exists public.announcements (
@@ -377,7 +378,7 @@ create trigger announcements_updated_at
   for each row execute function public.set_updated_at();
 
 -- ---------------------------------------------------------------------------
--- NOTIFICATIONS
+-- 10. NOTIFICATIONS
 -- ---------------------------------------------------------------------------
 
 create table if not exists public.notifications (
@@ -405,7 +406,7 @@ create policy "Admins manage all notifications" on public.notifications
 grant select, insert, update, delete on public.notifications to authenticated;
 
 -- ---------------------------------------------------------------------------
--- PROBLEM REPORTS
+-- 11. PROBLEM REPORTS
 -- ---------------------------------------------------------------------------
 
 create table if not exists public.problem_reports (
@@ -447,7 +448,7 @@ create trigger problem_reports_updated_at
   for each row execute function public.set_updated_at();
 
 -- ---------------------------------------------------------------------------
--- BENEFIT RELEASES (linked to profiles, not registry)
+-- 12. BENEFIT RELEASES
 -- ---------------------------------------------------------------------------
 
 create table if not exists public.benefit_releases (
@@ -478,7 +479,7 @@ create policy "Admins manage benefit releases" on public.benefit_releases
 grant select on public.benefit_releases to authenticated;
 
 -- ---------------------------------------------------------------------------
--- FEATURE FLAGS
+-- 13. FEATURE FLAGS
 -- ---------------------------------------------------------------------------
 
 create table if not exists public.feature_flags (
@@ -490,21 +491,21 @@ create table if not exists public.feature_flags (
 
 alter table public.feature_flags enable row level security;
 
+drop policy if exists "Anyone reads feature flags" on public.feature_flags;
+create policy "Anyone reads feature flags" on public.feature_flags
+  for select using (true);
+
 drop policy if exists "Admins manage feature flags" on public.feature_flags;
 create policy "Admins manage feature flags" on public.feature_flags
   for all to authenticated
   using (public.has_role(auth.uid(), 'admin'))
   with check (public.has_role(auth.uid(), 'admin'));
 
-drop policy if exists "Anyone reads feature flags" on public.feature_flags;
-create policy "Anyone reads feature flags" on public.feature_flags
-  for select using (true);
-
 grant select on public.feature_flags to anon, authenticated;
 grant insert, update, delete on public.feature_flags to authenticated;
 
 -- ---------------------------------------------------------------------------
--- SITE SETTINGS
+-- 14. SITE SETTINGS
 -- ---------------------------------------------------------------------------
 
 create table if not exists public.site_settings (
@@ -537,15 +538,12 @@ grant select on public.site_settings to anon, authenticated;
 grant update on public.site_settings to authenticated;
 
 -- ---------------------------------------------------------------------------
--- STORAGE BUCKET: uploads (for profile supporting documents, problem photos)
+-- 15. STORAGE BUCKET: uploads
 -- ---------------------------------------------------------------------------
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
-  'uploads',
-  'uploads',
-  false,
-  5242880,
+  'uploads', 'uploads', false, 5242880,
   array['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
 )
 on conflict (id) do nothing;
@@ -575,31 +573,26 @@ create policy "uploads admin delete" on storage.objects
   using (bucket_id = 'uploads' and public.has_role(auth.uid(), 'admin'));
 
 -- ---------------------------------------------------------------------------
--- SEED: default services (copy of what the app shows)
+-- 16. SEED DATA
 -- ---------------------------------------------------------------------------
 
 insert into public.services (code, name, description, requirements, fee, sort) values
-  ('barangay-clearance',    'Barangay Clearance',           'General-purpose clearance for employment, business, or personal use.',    '["Valid government-issued ID", "Cedula / Community Tax Certificate"]',           100,  1),
-  ('barangay-indigency',    'Certificate of Indigency',     'Certifies that you are a low-income resident of Barangay Wawa.',          '["Valid government-issued ID", "Proof of residence"]',                           0,    2),
-  ('barangay-residency',    'Certificate of Residency',     'Proves that you are a registered resident of Barangay Wawa.',             '["Valid government-issued ID", "Proof of residence (utility bill, etc.)"]',       100,  3),
-  ('business-clearance',    'Business Clearance',           'Required before obtaining a mayor''s permit for a new or renewing business.', '["DTI / SEC registration", "Valid government-issued ID", "Cedula"]',          300,  4),
-  ('blotter-report',        'Blotter Report / Police Clearance', 'Official record of a complaint or incident at the barangay level.', '["Valid government-issued ID", "Written account of the incident"]',              0,    5),
-  ('lot-ownership',         'Certificate of Lot Ownership', 'Certifies that you own or occupy a parcel of land in Barangay Wawa.',     '["Tax declaration", "Valid government-issued ID"]',                              100,  6)
+  ('barangay-clearance', 'Barangay Clearance', 'General-purpose clearance for employment, business, or personal use.', '["Valid government-issued ID","Cedula / Community Tax Certificate"]', 100, 1),
+  ('barangay-indigency', 'Certificate of Indigency', 'Certifies that you are a low-income resident of Barangay Wawa.', '["Valid government-issued ID","Proof of residence"]', 0, 2),
+  ('barangay-residency', 'Certificate of Residency', 'Proves that you are a registered resident of Barangay Wawa.', '["Valid government-issued ID","Proof of residence (utility bill, etc.)"]', 100, 3),
+  ('business-clearance', 'Business Clearance', 'Required before obtaining a mayor''s permit for a new or renewing business.', '["DTI / SEC registration","Valid government-issued ID","Cedula"]', 300, 4),
+  ('blotter-report', 'Blotter Report / Police Clearance', 'Official record of a complaint or incident at the barangay level.', '["Valid government-issued ID","Written account of the incident"]', 0, 5),
+  ('lot-ownership', 'Certificate of Lot Ownership', 'Certifies that you own or occupy a parcel of land in Barangay Wawa.', '["Tax declaration","Valid government-issued ID"]', 100, 6)
 on conflict (code) do nothing;
 
--- ---------------------------------------------------------------------------
--- SEED: default feature flags
--- ---------------------------------------------------------------------------
-
 insert into public.feature_flags (key, label, enabled, sort) values
-  ('court_booking',   'Court booking',          true,  1),
-  ('service_requests','Service requests',        true,  2),
-  ('problem_reports', 'Problem reports',         true,  3),
-  ('pwd_registry',    'PWD / Senior registry',   true,  4),
-  ('announcements',   'Announcements',           true,  5)
+  ('court_booking',    'Court booking',         true, 1),
+  ('service_requests', 'Service requests',      true, 2),
+  ('problem_reports',  'Problem reports',       true, 3),
+  ('pwd_registry',     'PWD / Senior registry', true, 4),
+  ('announcements',    'Announcements',         true, 5)
 on conflict (key) do nothing;
 
 -- =============================================================================
--- END OF BASE SCHEMA
--- After running this file, run the 4 numbered migration files in order.
+-- END — now run the 4 migration files in supabase/migrations/ in order.
 -- =============================================================================

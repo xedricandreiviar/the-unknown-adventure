@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "@tanstack/react-router";
-import { Accessibility, CalendarDays, ChevronDown, ClipboardList, Menu, UserPlus, UserRound, X } from "lucide-react";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { Accessibility, Bell, CalendarDays, ChevronDown, ClipboardList, Menu, UserPlus, UserRound, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { HotlinesModal } from "@/components/hotlines-modal";
 import { useLang } from "@/lib/i18n";
@@ -84,7 +84,21 @@ function useSignedIn() {
   return state;
 }
 
-/** Animated Services mega-menu (landscape 2-col layout on desktop). */
+function useUnreadCount() {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    // Only fetch when signed in
+    supabase.auth.getSession().then(({ data }) => {
+      if (!data.session) return;
+      supabase
+        .from("notifications")
+        .select("id", { count: "exact", head: true })
+        .eq("read", false)
+        .then(({ count: n }) => setCount(n ?? 0));
+    });
+  }, []);
+  return count;
+}
 function ServicesMenu({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useLang();
   const [open, setOpen] = useState(false);
@@ -250,6 +264,9 @@ export function SiteHeader() {
   const session = useSignedIn();
   const navigate = useNavigate();
   const dateLabel = useClock();
+  const unreadCount = useUnreadCount();
+  // Detect if we're currently on the account page
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   const signOut = async () => {
     await supabase.auth.signOut();
@@ -326,12 +343,28 @@ export function SiteHeader() {
           {/* Right-side actions */}
           <div className="flex items-center gap-2">
             {session ? (
-              <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex">
-                <Link to="/account" className="gap-1.5">
-                  <UserRound className="size-4" aria-hidden />
-                  {t("nav.myAccount")}
+              pathname === "/account" ? (
+                // On the account page — show notification bell instead
+                <Link
+                  to="/account"
+                  aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
+                  className="relative hidden sm:inline-flex items-center justify-center size-9 rounded-md border border-border hover:bg-secondary transition-colors"
+                >
+                  <Bell className="size-4" aria-hidden />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white">
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
+                  )}
                 </Link>
-              </Button>
+              ) : (
+                <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex">
+                  <Link to="/account" className="gap-1.5">
+                    <UserRound className="size-4" aria-hidden />
+                    {t("nav.myAccount")}
+                  </Link>
+                </Button>
+              )
             ) : (
               <Button asChild variant="gold" size="sm" className="hidden sm:inline-flex">
                 <Link to="/auth">{t("nav.signIn")}</Link>

@@ -7,6 +7,11 @@ import { useLang } from "@/lib/i18n";
 import { SITE } from "@/lib/site";
 import { SERVICES } from "@/lib/content";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  NotificationDialog,
+  NotificationRow,
+  type NotificationItem,
+} from "@/components/notifications-ui";
 import logoAsset from "@/assets/logo.png";
 
 /** Top-level nav items that are plain links (no dropdown). */
@@ -84,20 +89,148 @@ function useSignedIn() {
   return state;
 }
 
-function useUnreadCount() {
-  const [count, setCount] = useState(0);
+function useNotifications() {
+  const [items, setItems] = useState<NotificationItem[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  const load = async () => {
+    const { data: session } = await supabase.auth.getSession();
+    if (!session.session) return;
+    const { data } = await supabase
+      .from("notifications")
+      .select("id, title, body, link, read, created_at")
+      .order("created_at", { ascending: false })
+      .limit(20);
+    setItems((data as NotificationItem[]) ?? []);
+    setLoaded(true);
+  };
+
+  const markOne = async (id: string) => {
+    setItems((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    await supabase.from("notifications").update({ read: true }).eq("id", id);
+  };
+
+  const markAll = async () => {
+    setItems((prev) => prev.map((n) => ({ ...n, read: true })));
+    await supabase.from("notifications").update({ read: true }).eq("read", false);
+  };
+
+  const unread = items.filter((n) => !n.read).length;
+  return { items, loaded, unread, load, markOne, markAll };
+}
+
+/** Bell button with dropdown panel showing notifications */
+function NotificationBell() {
+  const [open, setOpen] = useState(false);
+  const [openItem, setOpenItem] = useState<NotificationItem | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const { items, loaded, unread, load, markOne, markAll } = useNotifications();
+
+  // Load notifications the first time the dropdown opens
+  const toggle = () => {
+    if (!open && !loaded) load();
+    setOpen((v) => !v);
+  };
+
+  // Close on outside click or Escape
   useEffect(() => {
-    // Only fetch when signed in
-    supabase.auth.getSession().then(({ data }) => {
-      if (!data.session) return;
-      supabase
-        .from("notifications")
-        .select("id", { count: "exact", head: true })
-        .eq("read", false)
-        .then(({ count: n }) => setCount(n ?? 0));
-    });
-  }, []);
-  return count;
+    if (!open) return;
+    const handler = (e: MouseEvent | KeyboardEvent) => {
+      if (e instanceof KeyboardEvent && e.key === "Escape") { setOpen(false); return; }
+      if (e instanceof MouseEvent && panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    document.addEventListener("keydown", handler);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("keydown", handler);
+    };
+  }, [open]);
+
+  const openOne = (item: NotificationItem) => {
+    setOpenItem({ ...item, read: true });
+    if (!item.read) markOne(item.id);
+  };
+
+  return (
+    <div ref={panelRef} className="relative hidden sm:block">
+      {/* Bell button — glows gold when there are unread notifications */}
+      <button
+        onClick={toggle}
+        aria-label={`Notifications${unread > 0 ? ` (${unread} unread)` : ""}`}
+        aria-expanded={open}
+        className="relative flex size-9 cursor-pointer items-center justify-center rounded-md border transition-colors"
+        style={{
+          borderColor: unread > 0 ? "var(--color-gold-deep)" : undefined,
+          backgroundColor: unread > 0 ? "oklch(0.905 0.075 92 / 0.18)" : undefined,
+        }}
+      >
+        <Bell
+          className="size-4 transition-colors"
+          style={{ color: unread > 0 ? "var(--color-gold-deep)" : undefined }}
+          aria-hidden
+        />
+        {/* Unread badge */}
+        {unread > 0 && (
+          <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white">
+            {unread > 9 ? "9+" : unread}
+          </span>
+        )}
+      </button>
+
+      {/* Dropdown panel */}
+      <div
+        style={{
+          opacity: open ? 1 : 0,
+          transform: open ? "translateY(0) scale(1)" : "translateY(-6px) scale(0.97)",
+          pointerEvents: open ? "auto" : "none",
+          transition: "opacity 0.2s ease-out, transform 0.2s ease-out",
+          transformOrigin: "top right",
+        }}
+        className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-2xl border border-border bg-card shadow-2xl"
+      >
+        {/* Header row */}
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+          <p className="text-sm font-semibold text-forest-deep">
+            Notifications
+            {unread > 0 && (
+              <span className="ml-2 rounded-full bg-destructive px-2 text-xs font-bold text-white">
+                {unread}
+              </span>
+            )}
+          </p>
+          {unread > 0 && (
+            <button
+              onClick={() => markAll()}
+              className="text-xs font-medium text-gold-deep hover:underline"
+            >
+              Mark all read
+            </button>
+          )}
+        </div>
+
+        {/* List */}
+        <ul className="max-h-80 overflow-y-auto divide-y divide-border">
+          {!loaded && (
+            <li className="px-4 py-6 text-center text-sm text-muted-foreground">Loading…</li>
+          )}
+          {loaded && items.length === 0 && (
+            <li className="px-4 py-6 text-center text-sm text-muted-foreground">
+              No notifications yet.
+            </li>
+          )}
+          {items.map((item) => (
+            <NotificationRow key={item.id} item={item} onOpen={openOne} />
+          ))}
+        </ul>
+      </div>
+
+      {/* Full notification dialog */}
+      <NotificationDialog item={openItem} onClose={() => setOpenItem(null)} />
+    </div>
+  );
 }
 function ServicesMenu({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useLang();
@@ -264,8 +397,7 @@ export function SiteHeader() {
   const session = useSignedIn();
   const navigate = useNavigate();
   const dateLabel = useClock();
-  const unreadCount = useUnreadCount();
-  // Detect if we're currently on the account page
+  // Hide "My Account" button when already on the account page
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   const signOut = async () => {
@@ -343,28 +475,19 @@ export function SiteHeader() {
           {/* Right-side actions */}
           <div className="flex items-center gap-2">
             {session ? (
-              pathname === "/account" ? (
-                // On the account page — show notification bell instead
-                <Link
-                  to="/account"
-                  aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
-                  className="relative hidden sm:inline-flex items-center justify-center size-9 rounded-md border border-border hover:bg-secondary transition-colors"
-                >
-                  <Bell className="size-4" aria-hidden />
-                  {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white">
-                      {unreadCount > 9 ? "9+" : unreadCount}
-                    </span>
-                  )}
-                </Link>
-              ) : (
-                <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex">
-                  <Link to="/account" className="gap-1.5">
-                    <UserRound className="size-4" aria-hidden />
-                    {t("nav.myAccount")}
-                  </Link>
-                </Button>
-              )
+              <>
+                {/* Notification bell — always visible when signed in */}
+                <NotificationBell />
+                {/* Hide "My Account" button when already on the account page */}
+                {pathname !== "/account" && (
+                  <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex">
+                    <Link to="/account" className="gap-1.5">
+                      <UserRound className="size-4" aria-hidden />
+                      {t("nav.myAccount")}
+                    </Link>
+                  </Button>
+                )}
+              </>
             ) : (
               <Button asChild variant="gold" size="sm" className="hidden sm:inline-flex">
                 <Link to="/auth">{t("nav.signIn")}</Link>

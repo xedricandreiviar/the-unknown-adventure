@@ -134,6 +134,9 @@ function AccountPage() {
       date_released: string | null;
     }>
   >([]);
+  const [requestPage, setRequestPage] = useState(1);
+  const [reservationPage, setReservationPage] = useState(1);
+  const PAGE_SIZE = 5;
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -525,10 +528,26 @@ function AccountPage() {
             <NotificationDialog item={openNotification} onClose={() => setOpenNotification(null)} />
           </section>
           <MyRequestsTable
-            requests={requests}
+            requests={requests.slice((requestPage - 1) * PAGE_SIZE, requestPage * PAGE_SIZE)}
             busy={busy}
             onCancel={(id) => void cancelRequest(id)}
           />
+          {/* Requests pagination */}
+          {requests.length > PAGE_SIZE && (
+            <div className="flex items-center justify-between gap-2 mt-2">
+              <p className="text-xs text-muted-foreground">
+                {(requestPage - 1) * PAGE_SIZE + 1}–{Math.min(requestPage * PAGE_SIZE, requests.length)} of {requests.length}
+              </p>
+              <div className="flex gap-1">
+                <Button size="sm" variant="outline" disabled={requestPage === 1} onClick={() => setRequestPage((p) => p - 1)}>
+                  ← Prev
+                </Button>
+                <Button size="sm" variant="outline" disabled={requestPage * PAGE_SIZE >= requests.length} onClick={() => setRequestPage((p) => p + 1)}>
+                  Next →
+                </Button>
+              </div>
+            </div>
+          )}
           <section>
             <h2 className="flex items-center gap-2 font-display text-xl font-semibold text-forest-deep">
               <CalendarDays className="size-5 text-gold-deep" aria-hidden />
@@ -542,35 +561,55 @@ function AccountPage() {
                 </Link>
               </p>
             ) : (
-              <ul className="mt-3 divide-y divide-border">
-                {reservations.map((item) => (
-                  <li
-                    key={item.id}
-                    className="flex flex-wrap items-center justify-between gap-3 py-3"
-                  >
-                    <div>
-                      <p className="font-medium">
-                        {item.res_date} ·{" "}
-                        {BOOKING_SLOTS.find((slot) => slot.start === item.slot)?.label ?? item.slot}
-                      </p>
-                      <p className="text-sm text-muted-foreground">{item.purpose}</p>
+              <>
+                <ul className="mt-3 divide-y divide-border">
+                  {reservations
+                    .slice((reservationPage - 1) * PAGE_SIZE, reservationPage * PAGE_SIZE)
+                    .map((item) => (
+                    <li
+                      key={item.id}
+                      className="flex flex-wrap items-center justify-between gap-3 py-3"
+                    >
+                      <div>
+                        <p className="font-medium">
+                          {item.res_date} ·{" "}
+                          {BOOKING_SLOTS.find((slot) => slot.start === item.slot)?.label ?? item.slot}
+                        </p>
+                        <p className="text-sm text-muted-foreground">{item.purpose}</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <StatusBadge status={item.status} />
+                        {item.status === "pending" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={busy}
+                            onClick={() => void cancelReservation(item.id)}
+                          >
+                            Cancel
+                          </Button>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                {/* Reservations pagination */}
+                {reservations.length > PAGE_SIZE && (
+                  <div className="flex items-center justify-between gap-2 mt-2">
+                    <p className="text-xs text-muted-foreground">
+                      {(reservationPage - 1) * PAGE_SIZE + 1}–{Math.min(reservationPage * PAGE_SIZE, reservations.length)} of {reservations.length}
+                    </p>
+                    <div className="flex gap-1">
+                      <Button size="sm" variant="outline" disabled={reservationPage === 1} onClick={() => setReservationPage((p) => p - 1)}>
+                        ← Prev
+                      </Button>
+                      <Button size="sm" variant="outline" disabled={reservationPage * PAGE_SIZE >= reservations.length} onClick={() => setReservationPage((p) => p + 1)}>
+                        Next →
+                      </Button>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <StatusBadge status={item.status} />
-                      {item.status === "pending" && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={busy}
-                          onClick={() => void cancelReservation(item.id)}
-                        >
-                          Cancel
-                        </Button>
-                      )}
-                    </div>
-                  </li>
-                ))}
-              </ul>
+                  </div>
+                )}
+              </>
             )}
           </section>
           <MyReportsTable reports={reports} />

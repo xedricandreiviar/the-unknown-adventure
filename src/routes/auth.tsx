@@ -60,6 +60,8 @@ function AuthPage() {
   const [document, setDocument] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // Shows the email-confirmation screen after a successful signup that requires confirmation
+  const [registered, setRegistered] = useState(false);
   const [busy, setBusy] = useState(false);
   const update = (key: keyof typeof fields, value: string) =>
     setFields((current) => ({ ...current, [key]: value }));
@@ -123,13 +125,11 @@ function AuthPage() {
         }
         setReviewing(false);
         // If Supabase returned a session the user is already signed in — go straight to account.
-        // If email confirmation is required, data.session is null — show the notice instead.
+        // If email confirmation is required, data.session is null — show confirmation screen.
         if (data.session) {
           await navigate({ to: "/account", replace: true });
         } else {
-          setNotice(
-            "Account created. Check your email to confirm, then sign in and upload your supporting ID in My Account. Your application is pending approval.",
-          );
+          setRegistered(true);
         }
       }
     } catch (cause) {
@@ -171,6 +171,65 @@ function AuthPage() {
     if (oauthError) setError(oauthError.message);
     setBusy(false);
   };
+
+  // ── Email confirmation screen ──────────────────────────────────────────
+  if (registered) {
+    return (
+      <div>
+        <PageHero
+          kicker="Resident account"
+          title="Check your email"
+          body="One last step before you're in."
+        />
+        <Reveal as="section" className="mx-auto max-w-xl px-4 py-16">
+          <div
+            className="rounded-2xl border border-border bg-card p-10 text-center"
+            style={{ boxShadow: "0 4px 24px oklch(0.235 0.055 155 / 0.08)" }}
+          >
+            {/* Envelope icon */}
+            <div className="mx-auto mb-6 flex size-16 items-center justify-center rounded-full bg-forest-deep/8 text-forest-deep">
+              <svg xmlns="http://www.w3.org/2000/svg" className="size-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <rect width="20" height="16" x="2" y="4" rx="2" />
+                <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+              </svg>
+            </div>
+
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gold-deep">
+              Registration submitted
+            </p>
+            <h2 className="mt-3 font-display text-3xl font-semibold leading-tight text-forest-deep">
+              Please check your Gmail to confirm your registration
+            </h2>
+            <p className="mt-4 text-base leading-relaxed text-muted-foreground">
+              We sent a confirmation link to{" "}
+              <span className="font-semibold text-forest-deep">{fields.email}</span>.
+              Click the link in that email to activate your account.
+            </p>
+
+            <div className="mt-6 rounded-xl border border-border bg-secondary/50 p-4 text-left text-sm text-muted-foreground space-y-1.5">
+              <p>✓ &nbsp;Your registration has been received</p>
+              <p>✓ &nbsp;A confirmation email has been sent to your Gmail</p>
+              <p>✓ &nbsp;After confirming, sign in and your account will be reviewed by the barangay</p>
+            </div>
+
+            <p className="mt-5 text-sm text-muted-foreground">
+              Didn't receive it? Check your spam folder or{" "}
+              <button
+                className="font-medium text-gold-deep underline-offset-2 hover:underline"
+                onClick={() => {
+                  setRegistered(false);
+                  setMode("signin");
+                }}
+              >
+                go back to sign in
+              </button>
+              .
+            </p>
+          </div>
+        </Reveal>
+      </div>
+    );
+  }
 
   if (reviewing && mode === "signup") {
     const fullName = [fields.first_name, fields.middle_name, fields.last_name]

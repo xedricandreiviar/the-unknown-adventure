@@ -63,7 +63,7 @@ function Index() {
       </PageHero>
 
       {/* ── Court — image left, schedule right ──────────────────── */}
-      <section className="mx-auto max-w-6xl px-6 py-24">
+      <section className="mx-auto max-w-6xl px-6 py-16">
         <div className="grid items-center gap-14 md:grid-cols-2">
 
           <Reveal direction="left">
@@ -115,7 +115,7 @@ function Index() {
       </section>
 
       {/* ── Services ─────────────────────────────────────────────── */}
-      <Reveal as="section" className="mx-auto max-w-6xl px-6 py-24" direction="up">
+      <Reveal as="section" className="mx-auto max-w-6xl px-6 py-16" direction="up">
         <div className="mb-12">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gold-deep">
             {t("home.servicesTitle")}
@@ -163,7 +163,7 @@ function Index() {
 
       {/* ── Announcements ─────────────────────────────────────────── */}
       <Reveal as="section" className="paper-texture-cream section-shadow-top" direction="up">
-        <div className="mx-auto max-w-6xl px-6 py-24">
+        <div className="mx-auto max-w-6xl px-6 py-16">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-gold-deep">
@@ -200,7 +200,7 @@ function Index() {
       </Reveal>
 
       {/* ── Officials ─────────────────────────────────────────────── */}
-      <Reveal as="section" className="mx-auto max-w-6xl px-6 py-24" direction="up">
+      <Reveal as="section" className="mx-auto max-w-6xl px-6 py-16" direction="up">
         <div className="mb-12 flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-gold-deep">
@@ -237,7 +237,7 @@ function Index() {
 
       {/* ── Map ───────────────────────────────────────────────────── */}
       <Reveal as="section" className="paper-texture-cream section-shadow-top" direction="up">
-        <div className="mx-auto max-w-6xl px-6 py-24">
+        <div className="mx-auto max-w-6xl px-6 py-16">
           <h2 className="font-display text-4xl font-semibold leading-tight text-forest-deep sm:text-5xl">
             {t("home.mapTitle")}
           </h2>
@@ -266,7 +266,7 @@ function Index() {
       </Reveal>
 
       {/* ── FAQ ───────────────────────────────────────────────────── */}
-      <Reveal as="section" className="mx-auto max-w-3xl px-6 py-24" direction="up">
+      <Reveal as="section" className="mx-auto max-w-3xl px-6 py-16" direction="up">
         <h2 className="font-display text-4xl font-semibold leading-tight text-forest-deep sm:text-5xl">
           {t("home.faqTitle")}
         </h2>

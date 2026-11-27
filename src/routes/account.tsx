@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
-import { CalendarDays, LogOut, Bell, TriangleAlert } from "lucide-react";
+import { CalendarDays, LogOut, TriangleAlert } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +22,6 @@ import {
 } from "@/lib/notifications.functions";
 import {
   NotificationDialog,
-  NotificationRow,
   type NotificationItem,
 } from "@/components/notifications-ui";
 import { getMyProblemReports, getMyBenefitReleases } from "@/lib/problems.functions";
@@ -114,7 +113,6 @@ function AccountPage() {
   >([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [openNotification, setOpenNotification] = useState<NotificationItem | null>(null);
-  const [showAllNotifications, setShowAllNotifications] = useState(false);
   const [reports, setReports] = useState<
     Array<{
       id: string;
@@ -138,6 +136,7 @@ function AccountPage() {
   const [reservationPage, setReservationPage] = useState(1);
   const PAGE_SIZE = 5;
   const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false); // locks the form after a successful save
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -213,6 +212,7 @@ function AccountPage() {
     try {
       await updateProfileFn({ data: { ...fields, birthdate: null, sex: "" } });
       setMessage("Profile updated.");
+      setSaved(true); // lock the form
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not update your profile.");
     } finally {
@@ -343,36 +343,48 @@ function AccountPage() {
 
   return (
     <div>
-      <PageHero
-        kicker="Resident account"
-        title={`${profile.first_name} ${profile.last_name}`}
-        body={profile.email}
-      >
-        <div className="flex flex-wrap items-center gap-3">
-          <StatusBadge status={profile.status} />
-          {isAdmin && (
-            <Button asChild variant="gold">
-              <Link to="/admin">Admin panel</Link>
+      {/* Slim account header — compact bar instead of full PageHero */}
+      <div className="border-b border-border bg-forest-deep px-4 py-5">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gold">
+              Resident account
+            </p>
+            <h1 className="mt-0.5 font-display text-xl font-semibold text-primary-foreground">
+              {profile.first_name} {profile.last_name}
+              <span className="ml-2 text-sm font-normal text-primary-foreground/60">
+                {profile.email}
+              </span>
+            </h1>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge status={profile.status} />
+            {isAdmin && (
+              <Button asChild variant="gold" size="sm">
+                <Link to="/admin">Admin panel</Link>
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={() => void signOut()}
+              className="border-white/30 bg-white/10 text-primary-foreground hover:bg-white/20">
+              <LogOut className="mr-1.5 size-3.5" aria-hidden />
+              Sign out
             </Button>
-          )}
-          <Button variant="outline" onClick={() => void signOut()}>
-            <LogOut className="mr-2 size-4" aria-hidden />
-            Sign out
-          </Button>
+          </div>
         </div>
-      </PageHero>
+      </div>
+
       {error && (
-        <p role="alert" className="mx-auto max-w-6xl px-4 pt-5 text-sm text-destructive">
+        <p role="alert" className="mx-auto max-w-6xl px-4 pt-4 text-sm text-destructive">
           {error}
         </p>
       )}
       {message && (
-        <p role="status" className="mx-auto max-w-6xl px-4 pt-5 text-sm text-forest">
+        <p role="status" className="mx-auto max-w-6xl px-4 pt-4 text-sm text-forest">
           {message}
         </p>
       )}
       {profile.status !== "approved" && (
-        <div className="mx-auto max-w-6xl px-4 pt-6">
+        <div className="mx-auto max-w-6xl px-4 pt-4">
           <div className="flex gap-3 border-l-4 border-gold-deep bg-gold-soft/30 p-4 text-sm">
             <TriangleAlert className="size-5 shrink-0 text-gold-deep" aria-hidden />
             <div>
@@ -391,148 +403,141 @@ function AccountPage() {
 
       <Reveal
         as="section"
-        className="mx-auto grid max-w-6xl gap-10 px-4 py-10 lg:grid-cols-[.9fr_1.1fr]"
+        className="mx-auto grid max-w-6xl gap-10 px-4 py-6 lg:grid-cols-[.9fr_1.1fr]"
       >
+        {/* LEFT — Resident profile */}
         <div>
-          <h2 className="font-display text-2xl font-semibold text-forest-deep">Resident profile</h2>
-          <form onSubmit={(event) => void saveProfile(event)} className="mt-4 space-y-4">
-            <div className="grid gap-3 sm:grid-cols-2">
-              {(
-                [
-                  "first_name",
-                  "middle_name",
-                  "last_name",
-                  "street",
-                  "purok",
-                  "contact_number",
-                ] as const
-              ).map((key) => (
-                <div className="space-y-1" key={key}>
-                  <Label htmlFor={`profile-${key}`}>
-                    {key.replaceAll("_", " ").replace(/^./, (letter) => letter.toUpperCase())}
-                  </Label>
-                  <Input
-                    id={`profile-${key}`}
-                    value={fields[key]}
-                    onChange={(event) => updateField(key, event.target.value)}
-                    required={key !== "middle_name"}
-                  />
-                </div>
-              ))}
-            </div>
-            <fieldset className="space-y-3 border border-border p-4">
-              <legend className="px-1 font-medium">Senior and PWD details</legend>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={fields.is_senior}
-                  onChange={(event) => updateField("is_senior", event.target.checked)}
-                />
-                Senior citizen
-              </label>
-              {fields.is_senior && (
-                <Input
-                  aria-label="Senior ID number"
-                  placeholder="Senior ID number"
-                  value={fields.senior_id_number}
-                  onChange={(event) => updateField("senior_id_number", event.target.value)}
-                />
-              )}
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={fields.is_pwd}
-                  onChange={(event) => updateField("is_pwd", event.target.checked)}
-                />
-                Person with disability
-              </label>
-              {fields.is_pwd && (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Input
-                    aria-label="PWD ID number"
-                    placeholder="PWD ID number"
-                    value={fields.pwd_id_number}
-                    onChange={(event) => updateField("pwd_id_number", event.target.value)}
-                  />
-                  <Input
-                    aria-label="Disability type"
-                    placeholder="Disability type"
-                    value={fields.pwd_disability_type}
-                    onChange={(event) => updateField("pwd_disability_type", event.target.value)}
-                  />
-                </div>
-              )}
-            </fieldset>
-            <Button variant="gold" disabled={busy}>
-              {busy ? "Saving…" : "Save profile"}
-            </Button>
-          </form>
-          <div className="mt-5 space-y-2 border-t border-border pt-4">
-            <Label htmlFor="account-document">Supporting ID document</Label>
-            <Input
-              id="account-document"
-              type="file"
-              accept="image/*,.pdf"
-              onChange={(event) => void uploadDocument(event.target.files?.[0])}
-              disabled={busy}
-            />
-            <p className="text-xs text-muted-foreground">
-              {profile.document_path
-                ? "A supporting document is on file. Upload a new one to replace it."
-                : "Upload a photo or PDF for account review."}
-            </p>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="font-display text-2xl font-semibold text-forest-deep">
+              Resident profile
+            </h2>
+            {/* Edit button — re-enables the form after it's been saved/locked */}
+            {saved && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => { setSaved(false); setMessage(""); }}
+              >
+                Edit
+              </Button>
+            )}
           </div>
+
+          {/* fieldset opacity drops to 60% when saved/locked */}
+          <form
+            onSubmit={(event) => void saveProfile(event)}
+            className="mt-4 space-y-4"
+          >
+            <fieldset
+              disabled={saved || busy}
+              className="space-y-4 transition-opacity duration-300"
+              style={{ opacity: saved ? 0.6 : 1 }}
+            >
+              <div className="grid gap-3 sm:grid-cols-2">
+                {(
+                  [
+                    "first_name",
+                    "middle_name",
+                    "last_name",
+                    "street",
+                    "purok",
+                    "contact_number",
+                  ] as const
+                ).map((key) => (
+                  <div className="space-y-1" key={key}>
+                    <Label htmlFor={`profile-${key}`}>
+                      {key.replaceAll("_", " ").replace(/^./, (letter) => letter.toUpperCase())}
+                    </Label>
+                    <Input
+                      id={`profile-${key}`}
+                      value={fields[key]}
+                      onChange={(event) => updateField(key, event.target.value)}
+                      required={key !== "middle_name"}
+                    />
+                  </div>
+                ))}
+              </div>
+              <fieldset className="space-y-3 border border-border p-4">
+                <legend className="px-1 font-medium">Senior and PWD details</legend>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={fields.is_senior}
+                    onChange={(event) => updateField("is_senior", event.target.checked)}
+                  />
+                  Senior citizen
+                </label>
+                {fields.is_senior && (
+                  <Input
+                    aria-label="Senior ID number"
+                    placeholder="Senior ID number"
+                    value={fields.senior_id_number}
+                    onChange={(event) => updateField("senior_id_number", event.target.value)}
+                  />
+                )}
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={fields.is_pwd}
+                    onChange={(event) => updateField("is_pwd", event.target.checked)}
+                  />
+                  Person with disability
+                </label>
+                {fields.is_pwd && (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Input
+                      aria-label="PWD ID number"
+                      placeholder="PWD ID number"
+                      value={fields.pwd_id_number}
+                      onChange={(event) => updateField("pwd_id_number", event.target.value)}
+                    />
+                    <Input
+                      aria-label="Disability type"
+                      placeholder="Disability type"
+                      value={fields.pwd_disability_type}
+                      onChange={(event) => updateField("pwd_disability_type", event.target.value)}
+                    />
+                  </div>
+                )}
+              </fieldset>
+
+              {/* Supporting document — moved inside form, above Save button */}
+              <div className="space-y-2 border-t border-border pt-4">
+                <Label htmlFor="account-document">Supporting ID document</Label>
+                <Input
+                  id="account-document"
+                  type="file"
+                  accept="image/*,.pdf"
+                  onChange={(event) => void uploadDocument(event.target.files?.[0])}
+                  disabled={busy}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {profile.document_path
+                    ? "A supporting document is on file. Upload a new one to replace it."
+                    : "Upload a photo or PDF for account review."}
+                </p>
+              </div>
+            </fieldset>
+
+            {/* Save button — hidden when already saved/locked */}
+            {!saved && (
+              <Button variant="gold" disabled={busy}>
+                {busy ? "Saving…" : "Save profile"}
+              </Button>
+            )}
+          </form>
         </div>
 
+        {/* RIGHT — activity sections */}
         <div className="space-y-8">
-          <section>
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="flex items-center gap-2 font-display text-xl font-semibold text-forest-deep">
-                <Bell className="size-5 text-gold-deep" aria-hidden />
-                Notifications
-                {notifications.some((item) => !item.read) && (
-                  <span className="rounded-full bg-destructive px-2 text-xs font-semibold leading-5 text-white">
-                    {notifications.filter((item) => !item.read).length}
-                  </span>
-                )}
-              </h2>
-              {notifications.some((item) => !item.read) && (
-                <Button size="sm" variant="outline" disabled={busy} onClick={() => void markRead()}>
-                  Mark all read
-                </Button>
-              )}
-            </div>
-            {notifications.length === 0 ? (
-              <p className="mt-3 text-sm text-muted-foreground">No notifications.</p>
-            ) : (
-              <>
-                <ul className="mt-3 divide-y divide-border border border-border">
-                  {(showAllNotifications ? notifications : notifications.slice(0, 6)).map(
-                    (item) => (
-                      <NotificationRow key={item.id} item={item} onOpen={openOne} />
-                    ),
-                  )}
-                </ul>
-                {notifications.length > 6 && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="mt-2"
-                    onClick={() => setShowAllNotifications((value) => !value)}
-                  >
-                    {showAllNotifications ? "Show fewer" : `Show all (${notifications.length})`}
-                  </Button>
-                )}
-              </>
-            )}
-            <NotificationDialog item={openNotification} onClose={() => setOpenNotification(null)} />
-          </section>
+          {/* Notification dialog lives here but the panel UI is removed — bell in header handles it */}
+          <NotificationDialog item={openNotification} onClose={() => setOpenNotification(null)} />
+
           <MyRequestsTable
             requests={requests.slice((requestPage - 1) * PAGE_SIZE, requestPage * PAGE_SIZE)}
             busy={busy}
             onCancel={(id) => void cancelRequest(id)}
           />
-          {/* Requests pagination */}
           {requests.length > PAGE_SIZE && (
             <div className="flex items-center justify-between gap-2 mt-2">
               <p className="text-xs text-muted-foreground">
@@ -548,6 +553,7 @@ function AccountPage() {
               </div>
             </div>
           )}
+
           <section>
             <h2 className="flex items-center gap-2 font-display text-xl font-semibold text-forest-deep">
               <CalendarDays className="size-5 text-gold-deep" aria-hidden />
@@ -566,34 +572,33 @@ function AccountPage() {
                   {reservations
                     .slice((reservationPage - 1) * PAGE_SIZE, reservationPage * PAGE_SIZE)
                     .map((item) => (
-                    <li
-                      key={item.id}
-                      className="flex flex-wrap items-center justify-between gap-3 py-3"
-                    >
-                      <div>
-                        <p className="font-medium">
-                          {item.res_date} ·{" "}
-                          {BOOKING_SLOTS.find((slot) => slot.start === item.slot)?.label ?? item.slot}
-                        </p>
-                        <p className="text-sm text-muted-foreground">{item.purpose}</p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <StatusBadge status={item.status} />
-                        {item.status === "pending" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={busy}
-                            onClick={() => void cancelReservation(item.id)}
-                          >
-                            Cancel
-                          </Button>
-                        )}
-                      </div>
-                    </li>
-                  ))}
+                      <li
+                        key={item.id}
+                        className="flex flex-wrap items-center justify-between gap-3 py-3"
+                      >
+                        <div>
+                          <p className="font-medium">
+                            {item.res_date} ·{" "}
+                            {BOOKING_SLOTS.find((slot) => slot.start === item.slot)?.label ?? item.slot}
+                          </p>
+                          <p className="text-sm text-muted-foreground">{item.purpose}</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <StatusBadge status={item.status} />
+                          {item.status === "pending" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={busy}
+                              onClick={() => void cancelReservation(item.id)}
+                            >
+                              Cancel
+                            </Button>
+                          )}
+                        </div>
+                      </li>
+                    ))}
                 </ul>
-                {/* Reservations pagination */}
                 {reservations.length > PAGE_SIZE && (
                   <div className="flex items-center justify-between gap-2 mt-2">
                     <p className="text-xs text-muted-foreground">
@@ -612,7 +617,9 @@ function AccountPage() {
               </>
             )}
           </section>
+
           <MyReportsTable reports={reports} />
+
           <section className="border border-border bg-card p-5">
             <h2 className="font-display text-xl font-semibold text-forest-deep">
               PWD and senior citizen registry
@@ -624,6 +631,7 @@ function AccountPage() {
               <Link to="/registry">Open registry</Link>
             </Button>
           </section>
+
           <section>
             <h2 className="font-display text-xl font-semibold text-forest-deep">
               Senior and PWD benefit releases

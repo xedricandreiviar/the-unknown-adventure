@@ -65,8 +65,9 @@ app.MapGet("/api/reports/pdf", async (HttpRequest request, SupabaseClient db, Re
     if (!await db.IsAdminAsync(token)) return Results.StatusCode(StatusCodes.Status403Forbidden);
     if (!TryRange(request, out var from, out var to, out var error)) return Results.BadRequest(new { error });
     var data = await reports.BuildAsync(from, to, token);
-    var pdf = ReportPdf.Build(data, preparedBy: request.Query["preparedBy"].ToString());
-    return Results.File(pdf, "application/pdf", $"wawa-report-{from:yyyy-MM-dd}.pdf");
+    // Polymorphism: BasePdf reference — Build() runs ReportPdf's override
+    BasePdf pdf = new ReportPdf(data, request.Query["preparedBy"].ToString());
+    return Results.File(pdf.Build(), "application/pdf", $"wawa-report-{from:yyyy-MM-dd}.pdf");
 });
 
 // Generate a certificate PDF for one service request.
@@ -85,8 +86,9 @@ app.MapPost("/api/certificates/generate", async (HttpRequest request, SupabaseCl
 
     var data = await certs.GetAsync(body.RequestId, token);
     var preparedBy = request.Query["preparedBy"].ToString();
-    var pdf = CertificatePdf.Build(data, string.IsNullOrWhiteSpace(preparedBy) ? "Barangay Staff" : preparedBy);
-    return Results.File(pdf, "application/pdf", $"certificate-{data.Code}.pdf");
+    // Polymorphism: BasePdf reference — Build() runs CertificatePdf's override
+    BasePdf pdf = new CertificatePdf(data, string.IsNullOrWhiteSpace(preparedBy) ? "Barangay Staff" : preparedBy);
+    return Results.File(pdf.Build(), "application/pdf", $"certificate-{data.Code}.pdf");
 });
 
 // Download a certificate PDF for one service request (GET for direct browser download).
@@ -98,8 +100,9 @@ app.MapGet("/api/certificates/{requestId}", async (string requestId, HttpRequest
 
     var data = await certs.GetAsync(requestId, token);
     var preparedBy = request.Query["preparedBy"].ToString();
-    var pdf = CertificatePdf.Build(data, string.IsNullOrWhiteSpace(preparedBy) ? "Barangay Staff" : preparedBy);
-    return Results.File(pdf, "application/pdf", $"certificate-{data.Code}.pdf");
+    // Polymorphism: BasePdf reference — Build() runs CertificatePdf's override
+    BasePdf pdf = new CertificatePdf(data, string.IsNullOrWhiteSpace(preparedBy) ? "Barangay Staff" : preparedBy);
+    return Results.File(pdf.Build(), "application/pdf", $"certificate-{data.Code}.pdf");
 });
 
 app.Run();

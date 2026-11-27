@@ -117,7 +117,8 @@ export const settingsSchema = z.object({
   office_email: z.string().trim().email("Enter a valid email address.").max(200),
   office_phone: optionalText(40),
   facebook_url: optionalText(200),
-  court_fee: z.coerce.number().min(0, "Fee cannot be negative.").max(100000),
+  court_fee:    z.coerce.number().min(0, "Fee cannot be negative.").max(100000),
+  daily_quota:  z.coerce.number().int().min(1, "Quota must be at least 1.").max(500).default(20),
 });
 
 export const serviceSchema = z.object({

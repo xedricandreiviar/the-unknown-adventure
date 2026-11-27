@@ -46,6 +46,7 @@ type SettingsForm = {
   office_phone: string;
   facebook_url: string;
   court_fee: string;
+  daily_quota: string;
 };
 
 type ServiceDraft = {
@@ -121,7 +122,8 @@ function SettingsPage() {
         office_email: site.settings.office_email,
         office_phone: site.settings.office_phone,
         facebook_url: site.settings.facebook_url,
-        court_fee: String(site.settings.court_fee),
+        court_fee:    String(site.settings.court_fee),
+        daily_quota:  String((site.settings as unknown as { daily_quota?: number }).daily_quota ?? 20),
       });
     }
   }, [siteFn]);
@@ -314,7 +316,8 @@ function SettingsPage() {
             {field("office_email", "Office email", undefined, "email")}
             {field("office_phone", "Office phone")}
             {field("facebook_url", "Facebook page link")}
-            {field("court_fee", "Court reservation fee (₱)", "Use 0 for free.", "number")}
+            {field("court_fee",    "Court reservation fee (₱)", "Use 0 for free.", "number")}
+            {field("daily_quota",  "Daily request quota", "Maximum requests scheduled per working day (default 20).", "number")}
           </div>
         )}
         <Button variant="gold" disabled={busy || !form} onClick={() => void saveSettings()}>

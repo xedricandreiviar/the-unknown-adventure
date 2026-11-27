@@ -634,6 +634,7 @@ function AccountPage() {
 
           <MyReportsTable reports={reports} />
 
+          {/* PWD / Senior registry + benefit releases in one card */}
           <section className="rounded-xl border border-border bg-card p-5">
             <div className="flex items-center justify-between gap-3">
               <h2 className="font-display text-xl font-semibold text-forest-deep">
@@ -644,35 +645,36 @@ function AccountPage() {
               </Button>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
-              Apply, follow your application, and see your pension and benefit releases.
+              Apply for the PWD or senior citizen registry, follow your application, and collect your benefits.
             </p>
-          </section>
 
-          <section>
-            <h2 className="font-display text-xl font-semibold text-forest-deep">
-              Benefit releases
-            </h2>
-            {releases.length === 0 ? (
-              <p className="mt-3 text-sm text-muted-foreground">No benefit releases listed.</p>
-            ) : (
-              <ul className="mt-4 divide-y divide-border">
-                {releases.map((item) => (
-                  <li key={item.id} className="flex items-center justify-between gap-3 py-3">
-                    <div>
-                      <p className="font-medium">
-                        {item.kind.toUpperCase()} · {item.description}
-                      </p>
-                      {item.date_released && (
-                        <p className="text-sm text-muted-foreground">
-                          Release date: {item.date_released}
+            {/* Benefit releases — shown directly in this card */}
+            <div className="mt-4 border-t border-border pt-4">
+              <p className="text-sm font-semibold text-forest-deep">Benefit releases</p>
+              {releases.length === 0 ? (
+                <p className="mt-2 text-sm text-muted-foreground">
+                  No benefit releases recorded yet.
+                </p>
+              ) : (
+                <ul className="mt-2 divide-y divide-border">
+                  {releases.map((item) => (
+                    <li key={item.id} className="flex items-center justify-between gap-3 py-2.5">
+                      <div>
+                        <p className="text-sm font-medium">
+                          {item.kind.toUpperCase()} · {item.description}
                         </p>
-                      )}
-                    </div>
-                    <StatusBadge status={item.status} />
-                  </li>
-                ))}
-              </ul>
-            )}
+                        {item.date_released && (
+                          <p className="text-xs text-muted-foreground">
+                            Release date: {item.date_released}
+                          </p>
+                        )}
+                      </div>
+                      <StatusBadge status={item.status} />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </section>
         </div>
       </Reveal>

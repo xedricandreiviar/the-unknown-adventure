@@ -44,6 +44,7 @@ export const Route = createFileRoute("/registry")({
 
 function RegistryPage() {
   const [ready, setReady] = useState(false);
+  const [showForm, setShowForm] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
   const [mine, setMine] = useState<Registrant[]>([]);
   const [releases, setReleases] = useState<BenefitRelease[]>([]);
@@ -204,19 +205,35 @@ function RegistryPage() {
             )}
 
             <section aria-labelledby="apply-heading" className="space-y-3">
-              <h2
-                id="apply-heading"
-                className="font-display text-xl font-semibold text-forest-deep"
-              >
-                New application
-              </h2>
-              <RegistrationForm
-                mode="online"
-                onRegistered={() => load()}
-                blockedCategories={mine
-                  .filter((r) => r.status === "pending" || r.status === "approved")
-                  .map((r) => r.category)}
-              />
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-4">
+                <div>
+                  <h2
+                    id="apply-heading"
+                    className="font-display text-lg font-semibold text-forest-deep"
+                  >
+                    New application
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    Register as a PWD or senior citizen.
+                  </p>
+                </div>
+                <Button
+                  variant="gold"
+                  size="sm"
+                  onClick={() => setShowForm((v) => !v)}
+                >
+                  {showForm ? "Cancel" : "Register"}
+                </Button>
+              </div>
+              {showForm && (
+                <RegistrationForm
+                  mode="online"
+                  onRegistered={() => { setShowForm(false); void load(); }}
+                  blockedCategories={mine
+                    .filter((r) => r.status === "pending" || r.status === "approved")
+                    .map((r) => r.category)}
+                />
+              )}
             </section>
           </>
         )}

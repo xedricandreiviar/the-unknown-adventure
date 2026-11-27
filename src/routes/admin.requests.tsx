@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Download } from "lucide-react";
+import { Download, FileDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
@@ -9,23 +9,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { REQUEST_ACTIVE, StatusBadge } from "@/components/status-badge";
-import { adminListRequests, adminUpdateRequest } from "@/lib/queue.functions";
+import { StatusBadge } from "@/components/status-badge";
+import {
+  adminListRequests,
+  adminUpdateRequest,
+  getRequestQuotaStats,
+} from "@/lib/queue.functions";
 
 export const Route = createFileRoute("/admin/requests")({
   component: RequestsPage,
@@ -33,33 +27,39 @@ export const Route = createFileRoute("/admin/requests")({
 
 type RequestStatus = "pending" | "in_queue" | "processing" | "ready" | "completed" | "rejected" | "cancelled";
 
-/** Who filed the request. This is read from the resident's profile, not copied onto the request. */
 type Resident = {
-  first_name: string;
-  middle_name: string;
-  last_name: string;
-  street: string;
-  purok: string;
-  barangay: string;
-  contact_number: string;
-  is_senior: boolean;
-  is_pwd: boolean;
+  first_name: string; middle_name: string; last_name: string;
+  street: string; purok: string; barangay: string;
+  contact_number: string; is_senior: boolean; is_pwd: boolean;
 };
 
 type ServiceRequest = {
-  id: string;
-  code: string;
-  status: RequestStatus;
-  details: string;
-  rejection_reason: string | null;
-  created_at: string;
-  pickup_date?: string | null;
-  certificate_path?: string | null;
+  id: string; code: string; status: RequestStatus; details: string;
+  rejection_reason: string | null; created_at: string;
+  pickup_date?: string | null; certificate_path?: string | null;
   service: { name: string; fee: number | string | null; code: string } | null;
   resident: Resident | null;
 };
 
 type View = "active" | "ready" | "completed" | "closed" | "all";
+
+const ACTIVE_STATUSES: RequestStatus[] = ["pending", "in_queue", "processing"];
+
+function viewOf(status: RequestStatus): Exclude<View, "all"> {
+  if (status === "ready") return "ready";
+  if (ACTIVE_STATUSES.includes(status)) return "active";
+  return status === "completed" ? "completed" : "closed";
+}
+
+function residentName(r: Resident | null) {
+  if (!r) return "Resident not found";
+  const n = [r.first_name, r.middle_name, r.last_name].map((p) => p.trim()).filter(Boolean).join(" ");
+  return n || "No name on file";
+}
+function residentAddress(r: Resident | null) {
+  if (!r) return "";
+  return [r.street, r.purok].map((p) => p.trim()).filter(Boolean).join(", ");
+}
 
 const VIEWS: Array<{ key: View; label: string }> = [
   { key: "active",    label: "Active" },
@@ -69,134 +69,96 @@ const VIEWS: Array<{ key: View; label: string }> = [
   { key: "all",       label: "All" },
 ];
 
-function viewOf(status: RequestStatus): Exclude<View, "all"> {
-  if (status === "ready") return "ready";
-  if (REQUEST_ACTIVE.includes(status)) return "active";
-  return status === "completed" ? "completed" : "closed";
-}
-
-function residentName(resident: Resident | null) {
-  if (!resident) return "Resident not found";
-  const name = [resident.first_name, resident.middle_name, resident.last_name]
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .join(" ");
-  return name || "No name on file";
-}
-
-function residentAddress(resident: Resident | null) {
-  if (!resident) return "";
-  return [resident.street, resident.purok]
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .join(", ");
-}
-
-/** The one forward step an admin can take from each status. */
-const NEXT_STEP: Partial<
-  Record<RequestStatus, { status: RequestStatus; label: string; done: string }>
-> = {
-  pending:    { status: "in_queue",   label: "Add to queue",        done: "placed in the queue" },
-  in_queue:   { status: "processing", label: "Start processing",    done: "marked as processing" },
-  processing: { status: "ready",      label: "Ready for release",   done: "marked as ready for pickup" },
-  ready:      { status: "completed",  label: "Mark as collected",   done: "marked as collected" },
-};
-
 function RequestsPage() {
-  const listFn = useServerFn(adminListRequests);
-  const confirm = useConfirm();
-  const updateFn = useServerFn(adminUpdateRequest);
+  const listFn       = useServerFn(adminListRequests);
+  const updateFn     = useServerFn(adminUpdateRequest);
+  const quotaFn      = useServerFn(getRequestQuotaStats);
+  const confirm      = useConfirm();
 
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
-  const [view, setView] = useState<View>("active");
-  const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
+  const [view,     setView]     = useState<View>("active");
+  const [search,   setSearch]   = useState("");
+  const [loading,  setLoading]  = useState(true);
+  const [busy,     setBusy]     = useState(false);
+  const [error,    setError]    = useState("");
+  const [message,  setMessage]  = useState("");
   const [rejecting, setRejecting] = useState<ServiceRequest | null>(null);
-  const [reason, setReason] = useState("");
+  const [reason,    setReason]    = useState("");
+  const [quota, setQuota] = useState<{ quota: number; todayCount: number; today: string } | null>(null);
 
   const reload = useCallback(async () => {
-    setRequests((await listFn({ data: {} })) as ServiceRequest[]);
-  }, [listFn]);
+    const [rows, q] = await Promise.all([
+      listFn({ data: {} }) as Promise<ServiceRequest[]>,
+      quotaFn(),
+    ]);
+    setRequests(rows);
+    setQuota(q);
+  }, [listFn, quotaFn]);
 
   useEffect(() => {
     let active = true;
-    listFn({ data: {} })
-      .then((rows) => {
-        if (active) setRequests(rows as ServiceRequest[]);
-      })
+    reload()
       .catch((cause: unknown) => {
         if (active) setError(cause instanceof Error ? cause.message : "Could not load requests.");
       })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [listFn]);
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [reload]);
 
-  const counts = useMemo(
-    () => ({
-      active:    requests.filter((item) => viewOf(item.status) === "active").length,
-      ready:     requests.filter((item) => viewOf(item.status) === "ready").length,
-      completed: requests.filter((item) => viewOf(item.status) === "completed").length,
-      closed:    requests.filter((item) => viewOf(item.status) === "closed").length,
-      all:       requests.length,
-    }),
-    [requests],
-  );
+  const counts = useMemo(() => ({
+    active:    requests.filter((r) => viewOf(r.status) === "active").length,
+    ready:     requests.filter((r) => viewOf(r.status) === "ready").length,
+    completed: requests.filter((r) => viewOf(r.status) === "completed").length,
+    closed:    requests.filter((r) => viewOf(r.status) === "closed").length,
+    all:       requests.length,
+  }), [requests]);
 
   const visible = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return requests.filter((item) => {
-      if (view !== "all" && viewOf(item.status) !== view) return false;
+    return requests.filter((r) => {
+      if (view !== "all" && viewOf(r.status) !== view) return false;
       if (!term) return true;
-      return `${item.code} ${residentName(item.resident)} ${item.service?.name ?? ""}`
-        .toLowerCase()
-        .includes(term);
+      return `${r.code} ${residentName(r.resident)} ${r.service?.name ?? ""}`.toLowerCase().includes(term);
     });
   }, [requests, view, search]);
 
-  const update = async (
-    item: ServiceRequest,
-    status: RequestStatus,
-    done: string,
-    why?: string,
-  ) => {
-    // Rejecting already asks for a reason in its own box.
-    if (why === undefined) {
-      const ok = await confirm({
-        title: `Do you want to update request ${item.code}?`,
-        description: `It will be marked as ${status.replace(/_/g, " ")}. The resident is notified.`,
-        confirmLabel: "Yes, update",
-      });
-      if (!ok) return;
-    }
-    setBusy(true);
-    setError("");
-    setMessage("");
-    try {
-      await updateFn({ data: { id: item.id, status, reason: why } });
-      await reload();
-      setMessage(`Request ${item.code} ${done}.`);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not update the request.");
-    } finally {
-      setBusy(false);
-    }
+  const run = async (work: () => Promise<unknown>, done: string) => {
+    setBusy(true); setError(""); setMessage("");
+    try { await work(); await reload(); setMessage(done); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "Could not update the request."); }
+    finally { setBusy(false); }
   };
 
-  const confirmReject = async () => {
-    if (!rejecting) return;
-    const trimmed = reason.trim();
-    if (trimmed.length < 5) return;
-    const target = rejecting;
-    setRejecting(null);
-    setReason("");
-    await update(target, "rejected", "was rejected", trimmed);
+  /**
+   * "Generate PDF" = mark as ready + open the certificate PDF.
+   * This is the single action admins take after the captain signs.
+   */
+  const generatePdf = async (item: ServiceRequest) => {
+    const ok = await confirm({
+      title:        `Generate certificate for ${item.code}?`,
+      description:  "This marks the request as ready for pickup and downloads the PDF for printing. The resident is notified.",
+      confirmLabel: "Yes, generate",
+    });
+    if (!ok) return;
+
+    // 1. Mark as ready (resident gets notified by adminUpdateRequest)
+    await run(
+      () => updateFn({ data: { id: item.id, status: "ready" } }),
+      `Certificate generated — request ${item.code} is now ready for pickup.`,
+    );
+
+    // 2. Open PDF
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) { setError("Sign in again to download the certificate."); return; }
+    const base = import.meta.env["VITE_CSHARP_API_URL"] ?? "http://localhost:5000";
+    const popup = window.open("", "_blank");
+    if (popup) {
+      popup.opener = null;
+      popup.location.href = `${base}/api/certificates/${item.id}?token=${encodeURIComponent(token)}`;
+    } else {
+      setError("Allow pop-ups to download the certificate PDF.");
+    }
   };
 
   const downloadCertificate = async (item: ServiceRequest) => {
@@ -206,57 +168,96 @@ function RequestsPage() {
     if (!token) { setError("Sign in again to download the certificate."); return; }
     const base = import.meta.env["VITE_CSHARP_API_URL"] ?? "http://localhost:5000";
     const popup = window.open("", "_blank");
-    if (!popup) { setError("Allow pop-ups to download the certificate."); return; }
-    popup.location.href = `${base}/api/certificates/${item.id}?token=${encodeURIComponent(token)}`;
+    if (popup) {
+      popup.opener = null;
+      popup.location.href = `${base}/api/certificates/${item.id}?token=${encodeURIComponent(token)}`;
+    } else {
+      setError("Allow pop-ups to download the certificate.");
+    }
+  };
+
+  const confirmReject = async () => {
+    if (!rejecting || reason.trim().length < 5) return;
+    const target = rejecting; const why = reason.trim();
+    setRejecting(null); setReason("");
+    await run(
+      () => updateFn({ data: { id: target.id, status: "rejected", reason: why } }),
+      `Request ${target.code} rejected.`,
+    );
+  };
+
+  const markCollected = async (item: ServiceRequest) => {
+    const ok = await confirm({
+      title: `Mark ${item.code} as collected?`,
+      description: "The resident picked up their document.",
+      confirmLabel: "Yes, mark collected",
+    });
+    if (!ok) return;
+    await run(
+      () => updateFn({ data: { id: item.id, status: "completed" } }),
+      `Request ${item.code} marked as collected.`,
+    );
   };
 
   return (
-    <div>
+    <div className="space-y-4">
+      {/* Daily quota banner */}
+      {quota && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 text-sm">
+          <span className="font-semibold text-forest-deep">Today ({quota.today})</span>
+          <span className="text-muted-foreground">
+            {quota.todayCount} of {quota.quota} daily slots used
+          </span>
+          <div className="flex-1 min-w-24">
+            <div className="h-2 rounded-full bg-muted overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gold-deep transition-all"
+                style={{ width: `${Math.min(100, Math.round((quota.todayCount / quota.quota) * 100))}%` }}
+              />
+            </div>
+          </div>
+          <span className={`text-xs font-medium ${quota.todayCount >= quota.quota ? "text-destructive" : "text-forest"}`}>
+            {quota.todayCount >= quota.quota ? "Quota reached" : `${quota.quota - quota.todayCount} remaining`}
+          </span>
+        </div>
+      )}
+
+      {/* Filter tabs + search */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-wrap gap-2" role="tablist" aria-label="Filter requests">
-          {VIEWS.map((item) => (
+          {VIEWS.map((v) => (
             <Button
-              key={item.key}
+              key={v.key}
               role="tab"
-              aria-selected={view === item.key}
+              aria-selected={view === v.key}
               size="sm"
-              variant={view === item.key ? "default" : "outline"}
-              onClick={() => setView(item.key)}
+              variant={view === v.key ? "default" : "outline"}
+              onClick={() => setView(v.key)}
             >
-              {item.label} ({counts[item.key]})
+              {v.label} ({counts[v.key]})
             </Button>
           ))}
         </div>
         <div className="w-full space-y-1 sm:w-72">
-          <Label htmlFor="request-search" className="sr-only">
-            Search requests
-          </Label>
+          <Label htmlFor="request-search" className="sr-only">Search requests</Label>
           <Input
             id="request-search"
             placeholder="Search code, name, or service"
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={(e) => setSearch(e.target.value)}
           />
         </div>
       </div>
 
-      {error && (
-        <p role="alert" className="mt-4 text-sm text-destructive">
-          {error}
-        </p>
-      )}
-      {message && (
-        <p role="status" className="mt-4 text-sm text-forest">
-          {message}
-        </p>
-      )}
+      {error   && <p role="alert"  className="text-sm text-destructive">{error}</p>}
+      {message && <p role="status" className="text-sm text-forest">{message}</p>}
 
       {loading ? (
-        <p className="mt-6 text-sm text-muted-foreground">Loading requests…</p>
+        <p className="text-sm text-muted-foreground">Loading requests…</p>
       ) : visible.length === 0 ? (
-        <p className="mt-6 text-sm text-muted-foreground">No requests in this view.</p>
+        <p className="text-sm text-muted-foreground">No requests in this view.</p>
       ) : (
-        <div className="mt-4 overflow-x-auto border border-border">
+        <div className="overflow-x-auto border border-border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -270,147 +271,119 @@ function RequestsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {visible.map((item) => {
-                const next = NEXT_STEP[item.status];
-                const canReject = REQUEST_ACTIVE.includes(item.status) || item.status === "ready";
-                return (
-                  <TableRow key={item.id}>
-                    <TableCell className="whitespace-nowrap font-mono text-sm">
-                      {item.code}
-                    </TableCell>
-                    <TableCell>
-                      <p className="font-medium">
-                        {residentName(item.resident)}
-                        {item.resident?.is_senior && (
-                          <span className="ml-2 text-xs font-normal text-gold-deep">Senior</span>
-                        )}
-                        {item.resident?.is_pwd && (
-                          <span className="ml-2 text-xs font-normal text-gold-deep">PWD</span>
-                        )}
+              {visible.map((item) => (
+                <TableRow key={item.id}>
+                  <TableCell className="whitespace-nowrap font-mono text-sm">{item.code}</TableCell>
+                  <TableCell>
+                    <p className="font-medium">
+                      {residentName(item.resident)}
+                      {item.resident?.is_senior && <span className="ml-1.5 text-xs text-gold-deep">Senior</span>}
+                      {item.resident?.is_pwd    && <span className="ml-1.5 text-xs text-gold-deep">PWD</span>}
+                    </p>
+                    <p className="text-xs text-muted-foreground">{item.resident?.contact_number}</p>
+                    <p className="text-xs text-muted-foreground">{residentAddress(item.resident) || "No address"}</p>
+                  </TableCell>
+                  <TableCell className="text-sm">
+                    {item.service?.name ?? "Unknown service"}
+                    {item.details && (
+                      <p className="mt-0.5 max-w-56 truncate text-xs text-muted-foreground" title={item.details}>
+                        {item.details}
                       </p>
-                      <p className="text-xs text-muted-foreground">
-                        {item.resident?.contact_number}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {residentAddress(item.resident) || "No address on file"}
-                      </p>
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {item.service?.name ?? "Unknown service"}
-                      {item.details && (
-                        <p
-                          className="mt-1 max-w-56 truncate text-xs text-muted-foreground"
-                          title={item.details}
+                    )}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap text-sm">
+                    {new Date(item.created_at).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap text-sm">
+                    {item.pickup_date
+                      ? new Date(item.pickup_date).toLocaleDateString("en-PH", { month: "short", day: "numeric" })
+                      : <span className="text-muted-foreground">—</span>}
+                  </TableCell>
+                  <TableCell>
+                    <StatusBadge status={item.status} />
+                    {item.status === "rejected" && item.rejection_reason && (
+                      <p className="mt-1 max-w-48 text-xs text-destructive">{item.rejection_reason}</p>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap justify-end gap-1.5">
+                      {/* Generate PDF — available on pending/in_queue/processing (captain has not signed yet) */}
+                      {ACTIVE_STATUSES.includes(item.status) && (
+                        <Button
+                          size="sm"
+                          variant="gold"
+                          disabled={busy}
+                          title="Generate certificate PDF and mark as ready for pickup"
+                          onClick={() => void generatePdf(item)}
                         >
-                          {item.details}
-                        </p>
+                          <FileDown className="size-3.5 mr-1" aria-hidden />
+                          Generate PDF
+                        </Button>
                       )}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-sm">
-                      {new Date(item.created_at).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-sm">
-                      {item.pickup_date
-                        ? new Date(item.pickup_date).toLocaleDateString("en-PH", { month: "short", day: "numeric" })
-                        : <span className="text-muted-foreground">—</span>}
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge status={item.status} />
-                      {item.status === "rejected" && item.rejection_reason && (
-                        <p className="mt-1 max-w-48 text-xs text-destructive">
-                          {item.rejection_reason}
-                        </p>
+                      {/* Re-download certificate once ready/completed */}
+                      {(item.status === "ready" || item.status === "completed") && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={busy}
+                          title="Download certificate PDF again"
+                          onClick={() => void downloadCertificate(item)}
+                        >
+                          <Download className="size-3.5 mr-1" aria-hidden />
+                          PDF
+                        </Button>
                       )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap justify-end gap-2">
-                        {/* Certificate download — available once processing starts */}
-                        {(item.status === "ready" || item.status === "completed") && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={busy}
-                            title="Download certificate PDF"
-                            onClick={() => void downloadCertificate(item)}
-                          >
-                            <Download className="size-4" aria-hidden />
-                            Certificate
-                          </Button>
-                        )}
-                        {next && (
-                          <Button
-                            size="sm"
-                            variant={next.status === "ready" ? "gold" : "default"}
-                            disabled={busy}
-                            onClick={() => void update(item, next.status, next.done)}
-                          >
-                            {next.label}
-                          </Button>
-                        )}
-                        {canReject && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={busy}
-                            onClick={() => {
-                              setReason("");
-                              setRejecting(item);
-                            }}
-                          >
-                            Reject
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
+                      {/* Mark collected — only on ready */}
+                      {item.status === "ready" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={busy}
+                          onClick={() => void markCollected(item)}
+                        >
+                          Mark collected
+                        </Button>
+                      )}
+                      {/* Reject — available while still active */}
+                      {ACTIVE_STATUSES.includes(item.status) && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={busy}
+                          onClick={() => { setReason(""); setRejecting(item); }}
+                        >
+                          Reject
+                        </Button>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         </div>
       )}
 
-      <Dialog
-        open={!!rejecting}
-        onOpenChange={(open) => {
-          if (!open) {
-            setRejecting(null);
-            setReason("");
-          }
-        }}
-      >
+      {/* Reject dialog */}
+      <Dialog open={!!rejecting} onOpenChange={(open) => { if (!open) { setRejecting(null); setReason(""); } }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Reject request {rejecting?.code}</DialogTitle>
-            <DialogDescription>
-              The resident is notified and sees this reason on their account.
-            </DialogDescription>
+            <DialogDescription>The resident is notified and sees this reason on their account.</DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
-            <Label htmlFor="request-reject-reason">Reason</Label>
+            <Label htmlFor="req-reject-reason">Reason</Label>
             <Textarea
-              id="request-reject-reason"
+              id="req-reject-reason"
               value={reason}
-              onChange={(event) => setReason(event.target.value)}
+              onChange={(e) => setReason(e.target.value)}
               maxLength={500}
-              placeholder="For example: missing proof of residency, please file again with a valid ID."
+              placeholder="e.g. Missing proof of residency — please file again with a valid ID."
             />
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setRejecting(null);
-                setReason("");
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              disabled={reason.trim().length < 5}
-              onClick={() => void confirmReject()}
-            >
+            <Button variant="outline" onClick={() => { setRejecting(null); setReason(""); }}>Cancel</Button>
+            <Button variant="destructive" disabled={reason.trim().length < 5} onClick={() => void confirmReject()}>
               Reject request
             </Button>
           </DialogFooter>

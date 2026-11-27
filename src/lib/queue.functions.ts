@@ -230,13 +230,37 @@ export const adminListRequests = createServerFn({ method: "GET" })
       .select(
         "*, service:services(name, fee, code), resident:profiles(first_name, middle_name, last_name, street, purok, barangay, contact_number, is_senior, is_pwd)",
       )
-      .order("created_at", { ascending: false });
+      // FIFO: oldest pending/active first, then newest for completed/closed
+      .order("created_at", { ascending: true });
     if (data.status) query = query.eq("status", data.status);
     if (data.from) query = query.gte("created_at", `${data.from}T00:00:00Z`);
     if (data.to) query = query.lte("created_at", `${data.to}T23:59:59Z`);
     const { data: rows, error } = await query;
     if (error) throw new Error(error.message);
     return rows ?? [];
+  });
+
+/** Returns today's quota (from site_settings) and how many requests are assigned today. */
+export const getRequestQuotaStats = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const todayManila = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
+
+    const [settingsResult, countResult] = await Promise.all([
+      context.supabase.from("site_settings").select("daily_quota").eq("id", 1).maybeSingle(),
+      context.supabase
+        .from("service_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("pickup_date", todayManila)
+        .not("status", "in", '("cancelled","rejected")'),
+    ]);
+
+    return {
+      quota: (settingsResult.data as { daily_quota?: number } | null)?.daily_quota ?? 20,
+      todayCount: countResult.count ?? 0,
+      today: todayManila,
+    };
   });
 
 export const adminUpdateRequest = createServerFn({ method: "POST" })

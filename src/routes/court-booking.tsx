@@ -1,7 +1,7 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
-import { CalendarDays, Clock3 } from "lucide-react";
+import { CalendarDays, Clock3, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,13 @@ import { Reveal } from "@/components/reveal";
 import { useConfirm } from "@/components/confirm-dialog";
 import { ReviewPanel } from "@/components/review-panel";
 import { StatusBadge } from "@/components/status-badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   getMyReservations,
   createReservation,
@@ -46,6 +53,7 @@ function CourtBookingPage() {
   const createReservationFn = useServerFn(createReservation);
   const cancelReservationFn = useServerFn(cancelMyReservation);
   const confirm = useConfirm();
+  const navigate = useNavigate();
   const [reviewing, setReviewing] = useState(false);
   const [date, setDate] = useState("");
   const [slot, setSlot] = useState("");
@@ -66,10 +74,25 @@ function CourtBookingPage() {
   >([]);
   const [signedIn, setSignedIn] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  // Confirmation popup state
+  const [confirmed, setConfirmed] = useState<{
+    date: string; slotLabel: string; purpose: string;
+  } | null>(null);
+
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
   const maxDate = new Date(Date.now() + 60 * 86400_000).toISOString().slice(0, 10);
+
+  // Current Manila time as HH:MM for comparing with slot start times on today
+  const nowManila = new Date().toLocaleTimeString("en-CA", {
+    timeZone: "Asia/Manila", hour: "2-digit", minute: "2-digit", hour12: false,
+  });
+
+  /** True if this slot's end time has already passed today */
+  function isPastSlot(slotItem: typeof BOOKING_SLOTS[number]): boolean {
+    if (date !== today) return false;
+    return slotItem.end <= nowManila;
+  }
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSignedIn(Boolean(data.session)));
@@ -87,25 +110,19 @@ function CourtBookingPage() {
         if (active) setAvailability(rows);
       })
       .catch(() => {
-        // If availability can't be loaded, show all slots as open so the form still works.
         if (active) setAvailability(BOOKING_SLOTS.map((s) => ({ ...s, status: "open" })));
       });
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [date, publicAvailability]);
 
   useEffect(() => {
     if (!signedIn) return;
-    myReservationsFn()
-      .then((rows) => setReservations(rows))
-      .catch(() => setReservations([]));
+    myReservationsFn().then(setReservations).catch(() => setReservations([]));
   }, [signedIn, myReservationsFn]);
 
   const goToReview = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
-    setMessage("");
     if (!date || !slot || !purpose.trim() || !phone.trim()) {
       setError("Fill in the date, time, purpose and contact number first.");
       return;
@@ -122,14 +139,11 @@ function CourtBookingPage() {
     if (!ok) return;
     setBusy(true);
     setError("");
-    setMessage("");
     try {
       await createReservationFn({ data: { res_date: date, slot, purpose, contact_number: phone } });
-      setMessage("Reservation request sent. It will appear below while the barangay reviews it.");
-      setPurpose("");
-      setPhone("");
-      setSlot("");
-      setReviewing(false);
+      const slotLabel = BOOKING_SLOTS.find((s) => s.start === slot)?.label ?? slot;
+      setConfirmed({ date, slotLabel, purpose: purpose.trim() });
+      setPurpose(""); setPhone(""); setSlot(""); setReviewing(false);
       const [rows, updated] = await Promise.all([
         myReservationsFn(),
         publicAvailability({ data: { date } }),
@@ -158,7 +172,6 @@ function CourtBookingPage() {
       await cancelReservationFn({ data: { id } });
       setReservations(await myReservationsFn());
       if (date) setAvailability(await publicAvailability({ data: { date } }));
-      setMessage("Reservation cancelled.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not cancel this reservation.");
     } finally {
@@ -194,26 +207,30 @@ function CourtBookingPage() {
           </div>
           <ul className="mt-5 divide-y divide-border border-y border-border bg-card">
             {BOOKING_SLOTS.map((item) => {
-              const state =
-                availability.find((row) => row.start === item.start)?.status ??
-                (date ? "open" : "choose a date");
+              const avail = availability.find((row) => row.start === item.start);
+              const dbStatus = avail?.status ?? (date ? "open" : "");
+              const past = isPastSlot(item);
+              const effectiveStatus = past ? "past" : dbStatus;
+
               return (
                 <li
                   key={item.start}
-                  className="flex flex-wrap items-center justify-between gap-2 px-3 py-3 text-sm sm:px-4"
+                  className={`flex flex-wrap items-center justify-between gap-2 px-3 py-3 text-sm sm:px-4 ${past ? "opacity-40" : ""}`}
                 >
                   <span className="flex items-center gap-2 font-medium">
                     <Clock3 className="size-4 text-gold-deep" aria-hidden />
                     {item.label}
                   </span>
-                  {state === "open" ? (
-                    <span className="text-forest">Available</span>
-                  ) : state === "taken" ? (
+                  {effectiveStatus === "past" ? (
+                    <span className="text-muted-foreground line-through text-xs">Past</span>
+                  ) : effectiveStatus === "open" ? (
+                    <span className="text-forest font-medium">Available</span>
+                  ) : effectiveStatus === "taken" ? (
                     <span className="text-muted-foreground">Reserved</span>
-                  ) : state === "blocked" ? (
+                  ) : effectiveStatus === "blocked" ? (
                     <span className="text-destructive">Closed</span>
                   ) : (
-                    <span className="text-muted-foreground">Choose a date</span>
+                    <span className="text-muted-foreground text-xs">Choose a date</span>
                   )}
                 </li>
               );
@@ -272,7 +289,11 @@ function CourtBookingPage() {
                 >
                   <option value="">Select a time</option>
                   {availability
-                    .filter((item) => item.status === "open")
+                    .filter((item) => {
+                      if (item.status !== "open") return false;
+                      const slotDef = BOOKING_SLOTS.find((s) => s.start === item.start);
+                      return slotDef ? !isPastSlot(slotDef) : true;
+                    })
                     .map((item) => (
                       <option key={item.start} value={item.start}>
                         {item.label}
@@ -307,15 +328,14 @@ function CourtBookingPage() {
                   {error}
                 </p>
               )}
-              {message && (
-                <p role="status" className="text-sm text-forest">
-                  {message}
-                </p>
-              )}
               <Button
                 type="submit"
                 variant="gold"
-                disabled={busy || !date || !availability.some((item) => item.status === "open")}
+                disabled={busy || !date || !availability.some((item) => {
+                  if (item.status !== "open") return false;
+                  const s = BOOKING_SLOTS.find((b) => b.start === item.start);
+                  return s ? !isPastSlot(s) : true;
+                })}
               >
                 <CalendarDays className="mr-2 size-4" aria-hidden />
                 Review booking
@@ -369,6 +389,40 @@ function CourtBookingPage() {
           </div>
         </Reveal>
       )}
+
+      {/* ── Booking confirmation popup ── */}
+      <Dialog open={!!confirmed} onOpenChange={(open) => { if (!open) setConfirmed(null); }}>
+        <DialogContent className="max-w-sm text-center">
+          <DialogHeader>
+            <DialogTitle className="flex flex-col items-center gap-2">
+              <CheckCircle2 className="size-10 text-forest" aria-hidden />
+              Reservation request sent!
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-1 text-sm text-muted-foreground">
+            <p>
+              <span className="font-semibold text-foreground">{confirmed?.date}</span>
+            </p>
+            <p>{confirmed?.slotLabel}</p>
+            <p className="italic">{confirmed?.purpose}</p>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            The barangay will review your request. You will receive a notification once it is
+            approved or updated.
+          </p>
+          <DialogFooter className="flex-col gap-2 sm:flex-col">
+            <Button variant="gold" className="w-full" onClick={() => {
+              setConfirmed(null);
+              void navigate({ to: "/account" });
+            }}>
+              Go to My Account
+            </Button>
+            <Button variant="outline" className="w-full" onClick={() => setConfirmed(null)}>
+              Book another slot
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

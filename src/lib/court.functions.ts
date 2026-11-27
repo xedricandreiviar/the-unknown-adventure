@@ -112,6 +112,29 @@ export const createReservation = createServerFn({ method: "POST" })
       }
       throw new Error(error.message);
     }
+
+    // Notify the resident
+    await context.supabase.from("notifications").insert({
+      user_id: context.userId,
+      title:   "Court reservation request sent",
+      body:    `Your request for ${data.res_date} has been received. The barangay will review it shortly.`,
+      link:    "/account",
+    });
+
+    // Notify all admins
+    const { data: admins } = await context.supabase
+      .from("user_roles").select("user_id").eq("role", "admin");
+    if (admins && admins.length > 0) {
+      await context.supabase.from("notifications").insert(
+        admins.map((a) => ({
+          user_id: a.user_id,
+          title:   "New court reservation request",
+          body:    `${data.res_date} · ${data.slot} — ${data.purpose.slice(0, 80)}`,
+          link:    "/admin/requests",
+        })),
+      );
+    }
+
     return { ok: true as const };
   });
 

@@ -18,8 +18,8 @@ export const STATUS_META: Record<string, Meta> = {
   processing: { label: "Processing", className: "bg-secondary text-forest", group: "active" },
   completed: { label: "Completed", className: "bg-forest text-primary-foreground", group: "finished" },
   cancelled: { label: "Cancelled", className: "bg-muted text-muted-foreground border-border", group: "finished" },
-  // reservations
-  // court blocks / releases
+  // queue — 'ready' means signed, waiting for resident pickup
+  ready: { label: "Ready for Pickup", className: "bg-gold text-forest-deep border-gold-deep/40", group: "active" },
   ready_for_release: { label: "Ready for Release", className: "bg-gold text-forest-deep", group: "active" },
   released: { label: "Released", className: "bg-forest text-primary-foreground", group: "finished" },
   // problems
@@ -49,7 +49,7 @@ export function isActiveStatus(status: string, activeSet: string[]): boolean {
   return activeSet.includes(status);
 }
 
-export const REQUEST_ACTIVE = ["pending", "in_queue", "processing"];
+export const REQUEST_ACTIVE = ["pending", "in_queue", "processing", "ready"];
 export const RESERVATION_ACTIVE = ["pending", "approved"];
 export const RELEASE_ACTIVE = ["pending", "approved", "ready_for_release"];
 export const PROBLEM_ACTIVE = ["submitted", "under_review", "in_progress"];

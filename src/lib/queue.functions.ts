@@ -62,7 +62,7 @@ export const submitRequest = createServerFn({ method: "POST" })
 
     const { data: service } = await context.supabase
       .from("services")
-      .select("id, code, enabled, name")
+      .select("id, code, enabled, name, weekly_limit")
       .eq("id", data.service_id)
       .single();
     if (!service) throw new Error("Choose a valid service.");
@@ -71,13 +71,27 @@ export const submitRequest = createServerFn({ method: "POST" })
       throw new Error(`Describe the matter in at least ${DETAILS_MIN_LENGTH} characters.`);
     }
 
-    // no duplicate active entries for the same service
+    // Weekly limit check (1 request per service per week by default)
+    const weeklyLimit = (service as unknown as { weekly_limit?: number }).weekly_limit ?? 1;
+    if (weeklyLimit > 0) {
+      const { data: weekCount } = await context.supabase.rpc("resident_weekly_requests", {
+        _user_id:    context.userId,
+        _service_id: data.service_id,
+      });
+      if ((weekCount ?? 0) >= weeklyLimit) {
+        throw new Error(
+          `You can only request ${service.name} once per week. Check My Account to track your existing request.`,
+        );
+      }
+    }
+
+    // No duplicate active entries for the same service (belt-and-suspenders)
     const { data: dup } = await context.supabase
       .from("service_requests")
       .select("code")
       .eq("user_id", context.userId)
       .eq("service_id", data.service_id)
-      .in("status", ["pending", "in_queue", "processing"])
+      .in("status", ["pending", "in_queue", "processing", "ready"])
       .maybeSingle();
     if (dup) {
       throw new Error(
@@ -85,19 +99,29 @@ export const submitRequest = createServerFn({ method: "POST" })
       );
     }
 
+    // Compute estimated pickup date using the DB function
+    const { data: pickupDate } = await context.supabase.rpc("compute_pickup_date");
+    const pickup = pickupDate as string | null;
+
     let lastError: string | null = null;
     for (let attempt = 0; attempt < 3; attempt++) {
       const { data: inserted, error } = await context.supabase
         .from("service_requests")
         .insert({
-          service_id: data.service_id,
-          details: data.details,
-          user_id: context.userId,
-          code: makeCode(service.code),
+          service_id:  data.service_id,
+          details:     data.details,
+          user_id:     context.userId,
+          code:        makeCode(service.code),
+          pickup_date: pickup,
         })
-        .select("code")
+        .select("code, pickup_date")
         .single();
-      if (!error && inserted) return { code: inserted.code };
+      if (!error && inserted) {
+        return {
+          code:        inserted.code as string,
+          pickup_date: (inserted as unknown as { pickup_date: string | null }).pickup_date,
+        };
+      }
       if (error.code === "23505") lastError = error.message;
       else throw new Error(error.message);
     }
@@ -176,7 +200,7 @@ export const adminUpdateRequest = createServerFn({ method: "POST" })
     z
       .object({
         id: z.string().uuid(),
-        status: z.enum(["pending", "in_queue", "processing", "completed", "rejected", "cancelled"]),
+        status: z.enum(["pending", "in_queue", "processing", "ready", "completed", "rejected", "cancelled"]),
         reason: z.string().trim().max(500).optional(),
       })
       .refine((d) => d.status !== "rejected" || (d.reason ?? "").length >= 5, {
@@ -188,7 +212,7 @@ export const adminUpdateRequest = createServerFn({ method: "POST" })
     await assertAdmin(context);
     const { data: row } = await context.supabase
       .from("service_requests")
-      .select("code, user_id")
+      .select("code, user_id, service:services(name, fee), resident:profiles(first_name, middle_name, last_name, street, purok, barangay, contact_number)")
       .eq("id", data.id)
       .single();
     if (!row) throw new Error("Request not found.");
@@ -203,20 +227,41 @@ export const adminUpdateRequest = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
 
     const label: Record<string, string> = {
-      pending: "set back to Pending",
-      in_queue: "placed In Queue",
-      processing: "marked as Processing",
-      completed: "completed and ready for pickup",
-      rejected: "rejected",
-      cancelled: "cancelled",
+      pending:    "set back to Pending",
+      in_queue:   "placed In Queue",
+      processing: "being processed",
+      ready:      "ready for pickup — please visit the barangay hall",
+      completed:  "completed",
+      rejected:   "rejected",
+      cancelled:  "cancelled",
     };
+
+    // When marked "ready", generate the certificate PDF via the C# API
+    if (data.status === "ready") {
+      const csharpUrl = process.env["VITE_CSHARP_API_URL"] ?? process.env["CSHARP_API_URL"] ?? "http://localhost:5000";
+      const session = await context.supabase.auth.getSession();
+      const token = session.data.session?.access_token;
+      if (token && csharpUrl) {
+        try {
+          // Fire-and-forget — don't block the status update if the C# API is down
+          void fetch(`${csharpUrl}/api/certificates/generate`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ request_id: data.id }),
+          });
+        } catch {
+          // Non-fatal
+        }
+      }
+    }
+
     await notify(
       context.supabase,
       row.user_id,
       `Request ${row.code} ${data.status === "rejected" ? "rejected" : "updated"}`,
       data.status === "rejected"
         ? `Your request ${row.code} was rejected. Reason: ${data.reason ?? "Not specified."}`
-        : `Your request ${row.code} was ${label[data.status]}.`,
+        : `Your request ${row.code} has been ${label[data.status]}.`,
       "/account",
     );
     return { ok: true as const };

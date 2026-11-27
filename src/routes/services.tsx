@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ClipboardList } from "lucide-react";
+import { ClipboardList, FileText } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { PageHero } from "@/components/page-hero";
 import { Reveal } from "@/components/reveal";
@@ -123,6 +123,14 @@ function ServicesPage() {
                         <li key={r}>{r}</li>
                       ))}
                     </ul>
+                    <div className="mt-4">
+                      <Button asChild size="sm" variant="gold">
+                        <Link to="/request" search={{ service: s.name }}>
+                          <FileText className="size-4" aria-hidden />
+                          Request this service
+                        </Link>
+                      </Button>
+                    </div>
                   </div>
                 </AccordionContent>
               </AccordionItem>

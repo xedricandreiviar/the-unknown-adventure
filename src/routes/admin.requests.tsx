@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Download } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,7 +31,7 @@ export const Route = createFileRoute("/admin/requests")({
   component: RequestsPage,
 });
 
-type RequestStatus = "pending" | "in_queue" | "processing" | "completed" | "rejected" | "cancelled";
+type RequestStatus = "pending" | "in_queue" | "processing" | "ready" | "completed" | "rejected" | "cancelled";
 
 /** Who filed the request. This is read from the resident's profile, not copied onto the request. */
 type Resident = {
@@ -51,20 +53,24 @@ type ServiceRequest = {
   details: string;
   rejection_reason: string | null;
   created_at: string;
+  pickup_date?: string | null;
+  certificate_path?: string | null;
   service: { name: string; fee: number | string | null; code: string } | null;
   resident: Resident | null;
 };
 
-type View = "active" | "completed" | "closed" | "all";
+type View = "active" | "ready" | "completed" | "closed" | "all";
 
 const VIEWS: Array<{ key: View; label: string }> = [
-  { key: "active", label: "Active" },
+  { key: "active",    label: "Active" },
+  { key: "ready",     label: "Ready for pickup" },
   { key: "completed", label: "Completed" },
-  { key: "closed", label: "Rejected / Cancelled" },
-  { key: "all", label: "All" },
+  { key: "closed",    label: "Rejected / Cancelled" },
+  { key: "all",       label: "All" },
 ];
 
 function viewOf(status: RequestStatus): Exclude<View, "all"> {
+  if (status === "ready") return "ready";
   if (REQUEST_ACTIVE.includes(status)) return "active";
   return status === "completed" ? "completed" : "closed";
 }
@@ -90,9 +96,10 @@ function residentAddress(resident: Resident | null) {
 const NEXT_STEP: Partial<
   Record<RequestStatus, { status: RequestStatus; label: string; done: string }>
 > = {
-  pending: { status: "in_queue", label: "Add to queue", done: "placed in the queue" },
-  in_queue: { status: "processing", label: "Start processing", done: "marked as processing" },
-  processing: { status: "completed", label: "Mark completed", done: "marked as completed" },
+  pending:    { status: "in_queue",   label: "Add to queue",        done: "placed in the queue" },
+  in_queue:   { status: "processing", label: "Start processing",    done: "marked as processing" },
+  processing: { status: "ready",      label: "Ready for release",   done: "marked as ready for pickup" },
+  ready:      { status: "completed",  label: "Mark as collected",   done: "marked as collected" },
 };
 
 function RequestsPage() {
@@ -133,10 +140,11 @@ function RequestsPage() {
 
   const counts = useMemo(
     () => ({
-      active: requests.filter((item) => viewOf(item.status) === "active").length,
+      active:    requests.filter((item) => viewOf(item.status) === "active").length,
+      ready:     requests.filter((item) => viewOf(item.status) === "ready").length,
       completed: requests.filter((item) => viewOf(item.status) === "completed").length,
-      closed: requests.filter((item) => viewOf(item.status) === "closed").length,
-      all: requests.length,
+      closed:    requests.filter((item) => viewOf(item.status) === "closed").length,
+      all:       requests.length,
     }),
     [requests],
   );
@@ -189,6 +197,17 @@ function RequestsPage() {
     setRejecting(null);
     setReason("");
     await update(target, "rejected", "was rejected", trimmed);
+  };
+
+  const downloadCertificate = async (item: ServiceRequest) => {
+    setError("");
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) { setError("Sign in again to download the certificate."); return; }
+    const base = import.meta.env["VITE_CSHARP_API_URL"] ?? "http://localhost:5000";
+    const popup = window.open("", "_blank");
+    if (!popup) { setError("Allow pop-ups to download the certificate."); return; }
+    popup.location.href = `${base}/api/certificates/${item.id}?token=${encodeURIComponent(token)}`;
   };
 
   return (
@@ -245,6 +264,7 @@ function RequestsPage() {
                 <TableHead>Resident</TableHead>
                 <TableHead>Service</TableHead>
                 <TableHead>Filed</TableHead>
+                <TableHead>Pickup</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -252,7 +272,7 @@ function RequestsPage() {
             <TableBody>
               {visible.map((item) => {
                 const next = NEXT_STEP[item.status];
-                const canReject = REQUEST_ACTIVE.includes(item.status);
+                const canReject = REQUEST_ACTIVE.includes(item.status) || item.status === "ready";
                 return (
                   <TableRow key={item.id}>
                     <TableCell className="whitespace-nowrap font-mono text-sm">
@@ -289,6 +309,11 @@ function RequestsPage() {
                     <TableCell className="whitespace-nowrap text-sm">
                       {new Date(item.created_at).toLocaleDateString()}
                     </TableCell>
+                    <TableCell className="whitespace-nowrap text-sm">
+                      {item.pickup_date
+                        ? new Date(item.pickup_date).toLocaleDateString("en-PH", { month: "short", day: "numeric" })
+                        : <span className="text-muted-foreground">—</span>}
+                    </TableCell>
                     <TableCell>
                       <StatusBadge status={item.status} />
                       {item.status === "rejected" && item.rejection_reason && (
@@ -299,10 +324,23 @@ function RequestsPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap justify-end gap-2">
+                        {/* Certificate download — available once processing starts */}
+                        {(item.status === "ready" || item.status === "completed") && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={busy}
+                            title="Download certificate PDF"
+                            onClick={() => void downloadCertificate(item)}
+                          >
+                            <Download className="size-4" aria-hidden />
+                            Certificate
+                          </Button>
+                        )}
                         {next && (
                           <Button
                             size="sm"
-                            variant="gold"
+                            variant={next.status === "ready" ? "gold" : "default"}
                             disabled={busy}
                             onClick={() => void update(item, next.status, next.done)}
                           >

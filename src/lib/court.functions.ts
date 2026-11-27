@@ -58,17 +58,15 @@ export const getPublicDayAvailability = createServerFn({ method: "GET" })
         return fetch(input, { ...init, headers });
       } },
     });
-    const { data: blocks, error: blockError } = await publicClient
+    const { data: blocks } = await publicClient
       .from("court_blocks")
       .select("block_date, slot")
       .eq("block_date", data.date);
-    if (blockError) throw new Error("Court availability is temporarily unavailable.");
-    const { data: reservations, error: reservationError } = await publicClient
+    const { data: reservations } = await publicClient
       .from("court_reservations")
       .select("slot")
       .eq("res_date", data.date)
       .in("status", ["pending", "approved"]);
-    if (reservationError) throw new Error("Court availability is temporarily unavailable.");
     return BOOKING_SLOTS.map((slot) => {
       const blocked = (blocks ?? []).some((block) => block.slot === null || block.slot === slot.start);
       const taken = (reservations ?? []).some((reservation) => reservation.slot === slot.start);

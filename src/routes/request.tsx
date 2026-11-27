@@ -25,8 +25,14 @@ import {
   REQUEST_PROFILE_FIELDS,
 } from "@/lib/validation";
 import { SITE } from "@/lib/site";
+import { z } from "zod";
+
+const searchSchema = z.object({
+  service: z.string().optional(), // pre-select a service by name, e.g. ?service=Barangay+Clearance
+});
 
 export const Route = createFileRoute("/request")({
+  validateSearch: searchSchema,
   head: () => ({
     meta: [
       { title: `File a Request — ${SITE.name}` },
@@ -77,6 +83,7 @@ function requirementList(value: unknown): string[] {
 }
 
 function RequestPage() {
+  const { service: preselect } = Route.useSearch();
   const siteFn = useServerFn(getSiteData);
   const profileFn = useServerFn(getMyProfile);
   const submitFn = useServerFn(submitRequest);
@@ -98,13 +105,20 @@ function RequestPage() {
 
   useEffect(() => {
     let active = true;
-    // The profile call fails when nobody is signed in, which we show as a sign-in prompt.
     Promise.all([siteFn(), profileFn().catch(() => null)])
       .then(([site, result]) => {
         if (!active) return;
-        setServices((site.services as Service[]).filter((item) => item.enabled));
+        const enabled = (site.services as Service[]).filter((item) => item.enabled);
+        setServices(enabled);
         setQueueOpen(site.flags.find((flag) => flag.key === "queueing")?.enabled ?? true);
         setProfile(result?.profile ? (result.profile as ResidentProfile) : null);
+        // Pre-select service from URL param (?service=Barangay+Clearance)
+        if (preselect) {
+          const match = enabled.find(
+            (s) => s.name.toLowerCase() === preselect.toLowerCase(),
+          );
+          if (match) setServiceId(match.id);
+        }
       })
       .catch((cause: unknown) => {
         if (active)
@@ -113,9 +127,8 @@ function RequestPage() {
       .finally(() => {
         if (active) setLoading(false);
       });
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [siteFn, profileFn]);
 
   const service = useMemo(
@@ -155,6 +168,7 @@ function RequestPage() {
     try {
       const result = await submitFn({ data: { service_id: service.id, details: details.trim() } });
       setSubmittedCode(result.code);
+      setPickupDate((result as unknown as { pickup_date?: string | null }).pickup_date ?? null);
     } catch (cause) {
       setSubmitError(cause instanceof Error ? cause.message : "Could not file the request.");
     } finally {
@@ -170,6 +184,8 @@ function RequestPage() {
     setSubmittedCode("");
     setReviewing(false);
   };
+
+  const [pickupDate, setPickupDate] = useState<string | null>(null);
 
   const hero = (
     <PageHero
@@ -249,6 +265,20 @@ function RequestPage() {
               request, and you can follow it under My Account. Bring the listed requirements when
               you claim it.
             </p>
+            {pickupDate && (
+              <div className="mt-4 rounded-lg border border-gold/60 bg-gold-soft/30 p-3 text-sm">
+                <p className="font-semibold text-gold-deep">Estimated pickup date</p>
+                <p className="mt-0.5 text-foreground">
+                  {new Date(pickupDate).toLocaleDateString("en-PH", {
+                    weekday: "long", year: "numeric", month: "long", day: "numeric",
+                  })}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Visit the barangay hall on or after this date with your requirements and this reference code.
+                  You will be notified when your document is ready for pickup.
+                </p>
+              </div>
+            )}
             <div className="mt-6 flex flex-wrap gap-3">
               <Button asChild variant="gold">
                 <Link to="/account">View my requests</Link>

@@ -14,6 +14,7 @@ builder.Services.AddCors(options =>
         policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod()));
 builder.Services.AddHttpClient<SupabaseClient>();
 builder.Services.AddScoped<ReportService>();
+builder.Services.AddScoped<CertificateService>();
 
 var app = builder.Build();
 app.UseCors();
@@ -23,7 +24,11 @@ app.MapGet("/health", () => Results.Ok(new { ok = true, service = "wawa-api" }))
 static string? TokenFrom(HttpRequest request)
 {
     var header = request.Headers.Authorization.ToString();
-    return header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) ? header[7..].Trim() : null;
+    if (header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        return header[7..].Trim();
+    // Also accept ?token=<jwt> for browser certificate downloads
+    var query = request.Query["token"].ToString();
+    return string.IsNullOrWhiteSpace(query) ? null : query;
 }
 
 static bool TryRange(HttpRequest request, out DateTimeOffset from, out DateTimeOffset to, out string error)
@@ -62,6 +67,39 @@ app.MapGet("/api/reports/pdf", async (HttpRequest request, SupabaseClient db, Re
     var data = await reports.BuildAsync(from, to, token);
     var pdf = ReportPdf.Build(data, preparedBy: request.Query["preparedBy"].ToString());
     return Results.File(pdf, "application/pdf", $"wawa-report-{from:yyyy-MM-dd}.pdf");
+});
+
+// Generate a certificate PDF for one service request.
+// Called by the website when an admin marks a request as "ready".
+app.MapPost("/api/certificates/generate", async (HttpRequest request, SupabaseClient db, CertificateService certs) =>
+{
+    var token = TokenFrom(request);
+    if (token is null) return Results.Unauthorized();
+    if (!await db.IsAdminAsync(token)) return Results.StatusCode(StatusCodes.Status403Forbidden);
+
+    CertificateRequest? body;
+    try { body = await request.ReadFromJsonAsync<CertificateRequest>(); }
+    catch { return Results.BadRequest(new { error = "Send { \"RequestId\": \"<uuid>\" }." }); }
+    if (body is null || string.IsNullOrWhiteSpace(body.RequestId))
+        return Results.BadRequest(new { error = "RequestId is required." });
+
+    var data = await certs.GetAsync(body.RequestId, token);
+    var preparedBy = request.Query["preparedBy"].ToString();
+    var pdf = CertificatePdf.Build(data, string.IsNullOrWhiteSpace(preparedBy) ? "Barangay Staff" : preparedBy);
+    return Results.File(pdf, "application/pdf", $"certificate-{data.Code}.pdf");
+});
+
+// Download a certificate PDF for one service request (GET for direct browser download).
+app.MapGet("/api/certificates/{requestId}", async (string requestId, HttpRequest request, SupabaseClient db, CertificateService certs) =>
+{
+    var token = TokenFrom(request);
+    if (token is null) return Results.Unauthorized();
+    if (!await db.IsAdminAsync(token)) return Results.StatusCode(StatusCodes.Status403Forbidden);
+
+    var data = await certs.GetAsync(requestId, token);
+    var preparedBy = request.Query["preparedBy"].ToString();
+    var pdf = CertificatePdf.Build(data, string.IsNullOrWhiteSpace(preparedBy) ? "Barangay Staff" : preparedBy);
+    return Results.File(pdf, "application/pdf", $"certificate-{data.Code}.pdf");
 });
 
 app.Run();

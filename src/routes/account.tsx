@@ -554,14 +554,19 @@ function AccountPage() {
             </div>
           )}
 
-          <section>
-            <h2 className="flex items-center gap-2 font-display text-xl font-semibold text-forest-deep">
-              <CalendarDays className="size-5 text-gold-deep" aria-hidden />
-              Court reservations
-            </h2>
+          <section className="rounded-xl border border-border bg-card p-5">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="flex items-center gap-2 font-display text-xl font-semibold text-forest-deep">
+                <CalendarDays className="size-5 text-gold-deep" aria-hidden />
+                Court reservations
+              </h2>
+              <Button asChild size="sm" variant="gold">
+                <Link to="/court-booking">Book the court</Link>
+              </Button>
+            </div>
             {reservations.length === 0 ? (
               <p className="mt-4 text-sm text-muted-foreground">
-                No reservations yet. Use "Book the court" above to check available slots.
+                No reservations yet. Click "Book the court" to check available slots.
               </p>
             ) : (
               <>
@@ -617,10 +622,15 @@ function AccountPage() {
 
           <MyReportsTable reports={reports} />
 
-          <section className="border border-border bg-card p-5">
-            <h2 className="font-display text-xl font-semibold text-forest-deep">
-              PWD and senior citizen registry
-            </h2>
+          <section className="rounded-xl border border-border bg-card p-5">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="font-display text-xl font-semibold text-forest-deep">
+                PWD / Senior registry
+              </h2>
+              <Button asChild size="sm" variant="gold">
+                <Link to="/registry">Open registry</Link>
+              </Button>
+            </div>
             <p className="mt-1 text-sm text-muted-foreground">
               Apply, follow your application, and see your pension and benefit releases.
             </p>

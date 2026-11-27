@@ -539,9 +539,9 @@ function AccountPage() {
             onCancel={(id) => void cancelRequest(id)}
           />
           {requests.length > PAGE_SIZE && (
-            <div className="flex items-center justify-between gap-2 mt-2">
+            <div className="flex items-center justify-between gap-2 rounded-xl border border-border bg-card px-4 py-3">
               <p className="text-xs text-muted-foreground">
-                {(requestPage - 1) * PAGE_SIZE + 1}–{Math.min(requestPage * PAGE_SIZE, requests.length)} of {requests.length}
+                Showing {(requestPage - 1) * PAGE_SIZE + 1}–{Math.min(requestPage * PAGE_SIZE, requests.length)} of {requests.length} requests
               </p>
               <div className="flex gap-1">
                 <Button size="sm" variant="outline" disabled={requestPage === 1} onClick={() => setRequestPage((p) => p - 1)}>
@@ -560,15 +560,12 @@ function AccountPage() {
               Court reservations
             </h2>
             {reservations.length === 0 ? (
-              <p className="mt-3 text-sm text-muted-foreground">
-                No reservations yet.{" "}
-                <Link to="/court-booking" className="text-gold-deep underline">
-                  Check availability
-                </Link>
+              <p className="mt-4 text-sm text-muted-foreground">
+                No reservations yet. Use "Book the court" above to check available slots.
               </p>
             ) : (
               <>
-                <ul className="mt-3 divide-y divide-border">
+                <ul className="mt-4 divide-y divide-border">
                   {reservations
                     .slice((reservationPage - 1) * PAGE_SIZE, reservationPage * PAGE_SIZE)
                     .map((item) => (
@@ -600,7 +597,7 @@ function AccountPage() {
                     ))}
                 </ul>
                 {reservations.length > PAGE_SIZE && (
-                  <div className="flex items-center justify-between gap-2 mt-2">
+                  <div className="mt-3 flex items-center justify-between gap-2">
                     <p className="text-xs text-muted-foreground">
                       {(reservationPage - 1) * PAGE_SIZE + 1}–{Math.min(reservationPage * PAGE_SIZE, reservations.length)} of {reservations.length}
                     </p>
@@ -627,19 +624,16 @@ function AccountPage() {
             <p className="mt-1 text-sm text-muted-foreground">
               Apply, follow your application, and see your pension and benefit releases.
             </p>
-            <Button asChild variant="gold" size="sm" className="mt-3">
-              <Link to="/registry">Open registry</Link>
-            </Button>
           </section>
 
           <section>
             <h2 className="font-display text-xl font-semibold text-forest-deep">
-              Senior and PWD benefit releases
+              Benefit releases
             </h2>
             {releases.length === 0 ? (
               <p className="mt-3 text-sm text-muted-foreground">No benefit releases listed.</p>
             ) : (
-              <ul className="mt-3 divide-y divide-border">
+              <ul className="mt-4 divide-y divide-border">
                 {releases.map((item) => (
                   <li key={item.id} className="flex items-center justify-between gap-3 py-3">
                     <div>

@@ -484,8 +484,8 @@ function AccountPage() {
           </div>
         </div>
 
-        <div className="space-y-8">
-          <section>
+        <div className="space-y-5">
+          <section className="rounded-xl border border-border bg-card p-5">
             <div className="flex items-center justify-between gap-3">
               <h2 className="flex items-center gap-2 font-display text-xl font-semibold text-forest-deep">
                 <Bell className="size-5 text-gold-deep" aria-hidden />
@@ -503,22 +503,20 @@ function AccountPage() {
               )}
             </div>
             {notifications.length === 0 ? (
-              <p className="mt-3 text-sm text-muted-foreground">No notifications.</p>
+              <p className="mt-4 text-sm text-muted-foreground">No notifications yet.</p>
             ) : (
               <>
-                <ul className="mt-3 divide-y divide-border border border-border">
-                  {(showAllNotifications ? notifications : notifications.slice(0, 6)).map(
-                    (item) => (
-                      <NotificationRow key={item.id} item={item} onOpen={openOne} />
-                    ),
-                  )}
+                <ul className="mt-4 divide-y divide-border rounded-lg border border-border">
+                  {(showAllNotifications ? notifications : notifications.slice(0, 6)).map((item) => (
+                    <NotificationRow key={item.id} item={item} onOpen={openOne} />
+                  ))}
                 </ul>
                 {notifications.length > 6 && (
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="mt-2"
-                    onClick={() => setShowAllNotifications((value) => !value)}
+                    className="mt-2 text-gold-deep"
+                    onClick={() => setShowAllNotifications((v) => !v)}
                   >
                     {showAllNotifications ? "Show fewer" : `Show all (${notifications.length})`}
                   </Button>
@@ -532,11 +530,10 @@ function AccountPage() {
             busy={busy}
             onCancel={(id) => void cancelRequest(id)}
           />
-          {/* Requests pagination */}
           {requests.length > PAGE_SIZE && (
-            <div className="flex items-center justify-between gap-2 mt-2">
+            <div className="flex items-center justify-between gap-2 rounded-xl border border-border bg-card px-4 py-3">
               <p className="text-xs text-muted-foreground">
-                {(requestPage - 1) * PAGE_SIZE + 1}–{Math.min(requestPage * PAGE_SIZE, requests.length)} of {requests.length}
+                Showing {(requestPage - 1) * PAGE_SIZE + 1}–{Math.min(requestPage * PAGE_SIZE, requests.length)} of {requests.length} requests
               </p>
               <div className="flex gap-1">
                 <Button size="sm" variant="outline" disabled={requestPage === 1} onClick={() => setRequestPage((p) => p - 1)}>
@@ -548,54 +545,52 @@ function AccountPage() {
               </div>
             </div>
           )}
-          <section>
-            <h2 className="flex items-center gap-2 font-display text-xl font-semibold text-forest-deep">
-              <CalendarDays className="size-5 text-gold-deep" aria-hidden />
-              Court reservations
-            </h2>
+          <section className="rounded-xl border border-border bg-card p-5">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="flex items-center gap-2 font-display text-xl font-semibold text-forest-deep">
+                <CalendarDays className="size-5 text-gold-deep" aria-hidden />
+                Court reservations
+              </h2>
+              <Button asChild size="sm" variant="gold">
+                <Link to="/court-booking">Book the court</Link>
+              </Button>
+            </div>
             {reservations.length === 0 ? (
-              <p className="mt-3 text-sm text-muted-foreground">
-                No reservations yet.{" "}
-                <Link to="/court-booking" className="text-gold-deep underline">
-                  Check availability
-                </Link>
+              <p className="mt-4 text-sm text-muted-foreground">
+                No reservations yet. Use "Book the court" above to check available slots.
               </p>
             ) : (
               <>
-                <ul className="mt-3 divide-y divide-border">
+                <ul className="mt-4 divide-y divide-border">
                   {reservations
                     .slice((reservationPage - 1) * PAGE_SIZE, reservationPage * PAGE_SIZE)
                     .map((item) => (
-                    <li
-                      key={item.id}
-                      className="flex flex-wrap items-center justify-between gap-3 py-3"
-                    >
-                      <div>
-                        <p className="font-medium">
-                          {item.res_date} ·{" "}
-                          {BOOKING_SLOTS.find((slot) => slot.start === item.slot)?.label ?? item.slot}
-                        </p>
-                        <p className="text-sm text-muted-foreground">{item.purpose}</p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <StatusBadge status={item.status} />
-                        {item.status === "pending" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={busy}
-                            onClick={() => void cancelReservation(item.id)}
-                          >
-                            Cancel
-                          </Button>
-                        )}
-                      </div>
-                    </li>
-                  ))}
+                      <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                        <div>
+                          <p className="font-medium">
+                            {item.res_date} ·{" "}
+                            {BOOKING_SLOTS.find((slot) => slot.start === item.slot)?.label ?? item.slot}
+                          </p>
+                          <p className="text-sm text-muted-foreground">{item.purpose}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <StatusBadge status={item.status} />
+                          {item.status === "pending" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={busy}
+                              onClick={() => void cancelReservation(item.id)}
+                            >
+                              Cancel
+                            </Button>
+                          )}
+                        </div>
+                      </li>
+                    ))}
                 </ul>
-                {/* Reservations pagination */}
                 {reservations.length > PAGE_SIZE && (
-                  <div className="flex items-center justify-between gap-2 mt-2">
+                  <div className="mt-3 flex items-center justify-between gap-2">
                     <p className="text-xs text-muted-foreground">
                       {(reservationPage - 1) * PAGE_SIZE + 1}–{Math.min(reservationPage * PAGE_SIZE, reservations.length)} of {reservations.length}
                     </p>
@@ -613,25 +608,29 @@ function AccountPage() {
             )}
           </section>
           <MyReportsTable reports={reports} />
-          <section className="border border-border bg-card p-5">
-            <h2 className="font-display text-xl font-semibold text-forest-deep">
-              PWD and senior citizen registry
-            </h2>
+
+          <section className="rounded-xl border border-border bg-card p-5">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="font-display text-xl font-semibold text-forest-deep">
+                PWD / Senior registry
+              </h2>
+              <Button asChild variant="gold" size="sm">
+                <Link to="/registry">Open registry</Link>
+              </Button>
+            </div>
             <p className="mt-1 text-sm text-muted-foreground">
               Apply, follow your application, and see your pension and benefit releases.
             </p>
-            <Button asChild variant="gold" size="sm" className="mt-3">
-              <Link to="/registry">Open registry</Link>
-            </Button>
           </section>
-          <section>
+
+          <section className="rounded-xl border border-border bg-card p-5">
             <h2 className="font-display text-xl font-semibold text-forest-deep">
-              Senior and PWD benefit releases
+              Benefit releases
             </h2>
             {releases.length === 0 ? (
               <p className="mt-3 text-sm text-muted-foreground">No benefit releases listed.</p>
             ) : (
-              <ul className="mt-3 divide-y divide-border">
+              <ul className="mt-4 divide-y divide-border">
                 {releases.map((item) => (
                   <li key={item.id} className="flex items-center justify-between gap-3 py-3">
                     <div>

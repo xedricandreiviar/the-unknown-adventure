@@ -24,7 +24,6 @@ export type MyRequest = {
 
 type View = "active" | "finished";
 
-/** A resident's requests in one table, with active and finished ones kept apart. */
 export function MyRequestsTable({
   requests,
   busy,
@@ -35,15 +34,16 @@ export function MyRequestsTable({
   onCancel: (id: string) => void;
 }) {
   const [view, setView] = useState<View>("active");
-  const activeCount = requests.filter((item) => REQUEST_ACTIVE.includes(item.status)).length;
+  const activeCount   = requests.filter((item) => REQUEST_ACTIVE.includes(item.status)).length;
   const finishedCount = requests.length - activeCount;
   const rows = requests.filter(
     (item) => REQUEST_ACTIVE.includes(item.status) === (view === "active"),
   );
 
   return (
-    <section>
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <section className="rounded-xl border border-border bg-card p-5">
+      {/* header row — title left, action button right, always same height */}
+      <div className="flex items-center justify-between gap-3">
         <h2 className="flex items-center gap-2 font-display text-xl font-semibold text-forest-deep">
           <FileText className="size-5 text-gold-deep" aria-hidden />
           My service requests
@@ -53,7 +53,8 @@ export function MyRequestsTable({
         </Button>
       </div>
 
-      <div className="mt-3 flex gap-2" role="tablist" aria-label="Filter my requests">
+      {/* tab filters */}
+      <div className="mt-4 flex gap-2" role="tablist" aria-label="Filter my requests">
         <Button
           role="tab"
           aria-selected={view === "active"}
@@ -75,11 +76,13 @@ export function MyRequestsTable({
       </div>
 
       {rows.length === 0 ? (
-        <p className="mt-3 text-sm text-muted-foreground">
-          {view === "active" ? "No active requests." : "No finished requests yet."}
+        <p className="mt-4 text-sm text-muted-foreground">
+          {view === "active"
+            ? "No active requests. Use "File a request" above to get started."
+            : "No finished requests yet."}
         </p>
       ) : (
-        <div className="mt-3 overflow-x-auto border border-border">
+        <div className="mt-4 overflow-x-auto rounded-lg border border-border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -93,10 +96,8 @@ export function MyRequestsTable({
             <TableBody>
               {rows.map((item) => (
                 <TableRow key={item.id}>
-                  <TableCell className="whitespace-nowrap font-mono text-sm">{item.code}</TableCell>
-                  <TableCell className="text-sm">
-                    {item.service?.name ?? "Unknown service"}
-                  </TableCell>
+                  <TableCell className="whitespace-nowrap font-mono text-xs">{item.code}</TableCell>
+                  <TableCell className="text-sm">{item.service?.name ?? "Unknown service"}</TableCell>
                   <TableCell className="whitespace-nowrap text-sm">
                     {new Date(
                       view === "active" ? item.created_at : (item.updated_at ?? item.created_at),
@@ -112,12 +113,7 @@ export function MyRequestsTable({
                   </TableCell>
                   <TableCell className="text-right">
                     {item.status === "pending" && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={busy}
-                        onClick={() => onCancel(item.id)}
-                      >
+                      <Button size="sm" variant="outline" disabled={busy} onClick={() => onCancel(item.id)}>
                         Cancel
                       </Button>
                     )}

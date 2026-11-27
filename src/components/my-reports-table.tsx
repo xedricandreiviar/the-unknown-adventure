@@ -26,28 +26,29 @@ export type MyReport = {
 
 type View = "active" | "finished";
 
-/** A resident's problem reports in one table, with active and finished ones kept apart. */
 export function MyReportsTable({ reports }: { reports: MyReport[] }) {
   const [view, setView] = useState<View>("active");
-  const activeCount = reports.filter((item) => PROBLEM_ACTIVE.includes(item.status)).length;
+  const activeCount   = reports.filter((item) => PROBLEM_ACTIVE.includes(item.status)).length;
   const finishedCount = reports.length - activeCount;
   const rows = reports.filter(
     (item) => PROBLEM_ACTIVE.includes(item.status) === (view === "active"),
   );
 
   return (
-    <section>
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <section className="rounded-xl border border-border bg-card p-5">
+      {/* header row — title left, action button right, always same height */}
+      <div className="flex items-center justify-between gap-3">
         <h2 className="flex items-center gap-2 font-display text-xl font-semibold text-forest-deep">
           <Megaphone className="size-5 text-gold-deep" aria-hidden />
-          My problems / reports
+          My problem reports
         </h2>
         <Button asChild size="sm" variant="gold">
           <Link to="/report">Report a problem</Link>
         </Button>
       </div>
 
-      <div className="mt-3 flex gap-2" role="tablist" aria-label="Filter my reports">
+      {/* tab filters */}
+      <div className="mt-4 flex gap-2" role="tablist" aria-label="Filter my reports">
         <Button
           role="tab"
           aria-selected={view === "active"}
@@ -69,11 +70,13 @@ export function MyReportsTable({ reports }: { reports: MyReport[] }) {
       </div>
 
       {rows.length === 0 ? (
-        <p className="mt-3 text-sm text-muted-foreground">
-          {view === "active" ? "No active reports." : "No resolved or rejected reports yet."}
+        <p className="mt-4 text-sm text-muted-foreground">
+          {view === "active"
+            ? "No active reports. Use "Report a problem" above if you have a concern."
+            : "No resolved or rejected reports yet."}
         </p>
       ) : (
-        <div className="mt-3 overflow-x-auto border border-border">
+        <div className="mt-4 overflow-x-auto rounded-lg border border-border">
           <Table>
             <TableHeader>
               <TableRow>

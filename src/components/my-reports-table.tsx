@@ -72,7 +72,7 @@ export function MyReportsTable({ reports }: { reports: MyReport[] }) {
       {rows.length === 0 ? (
         <p className="mt-4 text-sm text-muted-foreground">
           {view === "active"
-            ? "No active reports. Use "Report a problem" above if you have a concern."
+            ? "No active reports. Use 'Report a problem' above if you have a concern."
             : "No resolved or rejected reports yet."}
         </p>
       ) : (

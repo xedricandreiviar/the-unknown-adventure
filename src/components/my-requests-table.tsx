@@ -78,7 +78,7 @@ export function MyRequestsTable({
       {rows.length === 0 ? (
         <p className="mt-4 text-sm text-muted-foreground">
           {view === "active"
-            ? "No active requests. Use "File a request" above to get started."
+            ? "No active requests. Use 'File a request' above to get started."
             : "No finished requests yet."}
         </p>
       ) : (

@@ -7,15 +7,28 @@ namespace WawaApi;
 /// <summary>
 /// Generates a printable A5 barangay service certificate.
 /// One page per request — ready to print, sign, and hand to the resident.
+///
+/// Inherits from BasePdf:
+///   - Reuses Manila offset, Stamp(), DrawBarangayHeader(), DrawSignatureBlock()
+///   - Overrides Build() with its own A5 certificate layout (polymorphism)
 /// </summary>
-public static class CertificatePdf
+public class CertificatePdf : BasePdf          // ← Inheritance
 {
-    private static readonly TimeSpan Manila = TimeSpan.FromHours(8);
+    private readonly CertificateData _data;
+    private readonly string _preparedBy;
 
-    private static string Stamp(DateTimeOffset value) =>
-        value.ToOffset(Manila).ToString("MMMM d, yyyy");
+    public CertificatePdf(CertificateData data, string preparedBy)
+    {
+        _data       = data;
+        _preparedBy = preparedBy;
+    }
 
-    public static byte[] Build(CertificateData data, string preparedBy)
+    /// <summary>
+    /// Polymorphism: BasePdf declares Build() as abstract.
+    /// This override produces an A5 certificate layout.
+    /// ReportPdf.Build() produces a different layout from the same method name.
+    /// </summary>
+    public override byte[] Build()             // ← Polymorphism (override)
     {
         QuestPDF.Settings.License = LicenseType.Community;
 
@@ -27,20 +40,12 @@ public static class CertificatePdf
                 page.Margin(28);
                 page.DefaultTextStyle(style => style.FontSize(10));
 
+                // ── Header — uses inherited helper ─────────────────────────
                 page.Header().Column(col =>
-                {
-                    col.Item().AlignCenter().Text("Republic of the Philippines").FontSize(8).Italic();
-                    col.Item().AlignCenter().Text("Taguig City").FontSize(8);
-                    col.Item().PaddingTop(4).AlignCenter()
-                       .Text("BARANGAY WAWA UNITED").FontSize(16).Bold();
-                    col.Item().AlignCenter().Text("Taguig City, Metro Manila").FontSize(8);
-                    col.Item().PaddingTop(6).LineHorizontal(2);
-                    col.Item().PaddingTop(4).AlignCenter()
-                       .Text($"CERTIFICATE FOR {data.ServiceName.ToUpperInvariant()}")
-                       .FontSize(12).SemiBold();
-                    col.Item().PaddingTop(2).LineHorizontal(0.5f);
-                });
+                    DrawBarangayHeader(col,
+                        $"CERTIFICATE FOR {_data.ServiceName.ToUpperInvariant()}"));
 
+                // ── Content ────────────────────────────────────────────────
                 page.Content().PaddingVertical(12).Column(col =>
                 {
                     col.Spacing(10);
@@ -48,38 +53,38 @@ public static class CertificatePdf
                     col.Item().Text(text =>
                     {
                         text.Span("Reference number: ").SemiBold();
-                        text.Span(data.Code).FontFamily("Courier New");
+                        text.Span(_data.Code).SemiBold();
                     });
 
                     col.Item().Text(text =>
                     {
                         text.Span("This is to certify that ").Italic();
-                        text.Span(data.ResidentName).Bold();
+                        text.Span(_data.ResidentName).Bold();
                         text.Span(", a resident of ").Italic();
-                        text.Span(data.Address);
-                        if (data.IsSenior)
+                        text.Span(_data.Address);
+                        if (_data.IsSenior)
                             text.Span(" (Senior Citizen)").Italic();
-                        if (data.IsPwd)
+                        if (_data.IsPwd)
                             text.Span(" (PWD)").Italic();
                         text.Span(", has filed a request for ").Italic();
-                        text.Span(data.ServiceName).Bold();
+                        text.Span(_data.ServiceName).Bold();
                         text.Span(" with this barangay.").Italic();
                     });
 
                     col.Item().Text(text =>
                     {
                         text.Span("Contact number: ").SemiBold();
-                        text.Span(data.ContactNumber);
+                        text.Span(_data.ContactNumber);
                     });
 
                     col.Item().Text(text =>
                     {
                         text.Span("Date filed: ").SemiBold();
-                        text.Span(Stamp(data.FiledAt));
+                        text.Span(Stamp(_data.FiledAt));   // ← inherited from BasePdf
                     });
 
-                    if (data.PickupDate is not null &&
-                        DateOnly.TryParse(data.PickupDate, out var pickup))
+                    if (_data.PickupDate is not null &&
+                        DateOnly.TryParse(_data.PickupDate, out var pickup))
                     {
                         col.Item().Text(text =>
                         {
@@ -89,26 +94,16 @@ public static class CertificatePdf
                     }
 
                     col.Item().PaddingTop(4).Text(
-                        "This certificate is issued upon the request of the interested party for " +
-                        "whatever legal purpose it may serve."
+                        "This certificate is issued upon the request of the interested " +
+                        "party for whatever legal purpose it may serve."
                     ).Italic().FontSize(9);
 
+                    // ── Signature block — uses inherited helper ────────────
                     col.Item().PaddingTop(16).Row(row =>
-                    {
-                        row.RelativeItem().Column(c =>
-                        {
-                            c.Item().BorderTop(1).PaddingTop(2).AlignCenter().Text(preparedBy).SemiBold();
-                            c.Item().AlignCenter().Text("Prepared by").FontSize(8);
-                        });
-                        row.ConstantItem(30);
-                        row.RelativeItem().Column(c =>
-                        {
-                            c.Item().BorderTop(1).PaddingTop(2).AlignCenter().Text(" ");
-                            c.Item().AlignCenter().Text("Punong Barangay").FontSize(8);
-                        });
-                    });
+                        DrawSignatureBlock(row, _preparedBy));
                 });
 
+                // ── Footer ─────────────────────────────────────────────────
                 page.Footer().AlignRight().Text(text =>
                 {
                     text.Span($"Issued: {DateTimeOffset.UtcNow.ToOffset(Manila):MMM d, yyyy}  ·  ");

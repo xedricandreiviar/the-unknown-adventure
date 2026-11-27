@@ -184,12 +184,24 @@ function AccountPage() {
       .finally(() => {
         if (active) setLoading(false);
       });
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [profileFn, requestsFn, reservationsFn, notificationsFn, reportsFn, releasesFn]);
 
-  const signOut = async () => {
+  // Realtime: refresh notifications, requests and reports the moment the DB changes
+  useEffect(() => {
+    const channel = supabase
+      .channel("account-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "notifications" },
+        () => { void notificationsFn().then(setNotifications).catch(() => undefined); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "service_requests" },
+        () => { void requestsFn().then(setRequests).catch(() => undefined); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "problem_reports" },
+        () => { void reportsFn().then(setReports).catch(() => undefined); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "court_reservations" },
+        () => { void reservationsFn().then(setReservations).catch(() => undefined); })
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [notificationsFn, requestsFn, reportsFn, reservationsFn]);  const signOut = async () => {
     if (!(await confirm({ title: "Do you want to sign out?", confirmLabel: "Yes, sign out" })))
       return;
     await supabase.auth.signOut();

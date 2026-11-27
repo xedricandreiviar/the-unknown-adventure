@@ -105,6 +105,29 @@ function useNotifications() {
     setLoaded(true);
   };
 
+  // Load on mount so the unread badge shows immediately without opening the dropdown
+  useEffect(() => {
+    void load();
+
+    // Realtime: update the bell badge the moment a new notification arrives
+    const channel = supabase
+      .channel("header-notifications-realtime")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "notifications" },
+        () => void load(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "notifications" },
+        () => void load(),
+      )
+      .subscribe();
+
+    return () => { void supabase.removeChannel(channel); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const markOne = async (id: string) => {
     setItems((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
     await supabase.from("notifications").update({ read: true }).eq("id", id);
@@ -126,9 +149,9 @@ function NotificationBell() {
   const panelRef = useRef<HTMLDivElement>(null);
   const { items, loaded, unread, load, markOne, markAll } = useNotifications();
 
-  // Load notifications the first time the dropdown opens
+  // Reload when dropdown opens in case anything changed
   const toggle = () => {
-    if (!open && !loaded) load();
+    if (!open) void load();
     setOpen((v) => !v);
   };
 

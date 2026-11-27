@@ -117,10 +117,35 @@ export const submitRequest = createServerFn({ method: "POST" })
         .select("code, pickup_date")
         .single();
       if (!error && inserted) {
-        return {
-          code:        inserted.code as string,
-          pickup_date: (inserted as unknown as { pickup_date: string | null }).pickup_date,
-        };
+        const code = inserted.code as string;
+        const pd = (inserted as unknown as { pickup_date: string | null }).pickup_date;
+
+        // Notify the resident that their request was received
+        await notify(
+          context.supabase,
+          context.userId,
+          `Request filed: ${service.name}`,
+          `Your request ${code} has been received.${pd ? ` Estimated pickup: ${new Date(pd).toLocaleDateString("en-PH")}.` : ""} Bring your requirements when you collect it.`,
+          "/account",
+        );
+
+        // Notify all admins that a new request is waiting
+        const { data: admins } = await context.supabase
+          .from("user_roles")
+          .select("user_id")
+          .eq("role", "admin");
+        if (admins && admins.length > 0) {
+          await context.supabase.from("notifications").insert(
+            admins.map((a) => ({
+              user_id: a.user_id,
+              title:   `New request: ${service.name}`,
+              body:    `${profile.first_name} ${profile.last_name} filed ${code}.`,
+              link:    "/admin/requests",
+            })),
+          );
+        }
+
+        return { code, pickup_date: pd };
       }
       if (error.code === "23505") lastError = error.message;
       else throw new Error(error.message);
@@ -157,6 +182,14 @@ export const cancelMyRequest = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => z.object({ id: z.string().uuid() }).parse(data))
   .handler(async ({ data, context }) => {
+    // Fetch the code and service name before cancelling so we can use them in the notification
+    const { data: row } = await context.supabase
+      .from("service_requests")
+      .select("code, service:services(name)")
+      .eq("id", data.id)
+      .eq("user_id", context.userId)
+      .maybeSingle();
+
     const { error } = await context.supabase
       .from("service_requests")
       .update({ status: "cancelled" })
@@ -164,6 +197,18 @@ export const cancelMyRequest = createServerFn({ method: "POST" })
       .eq("user_id", context.userId)
       .eq("status", "pending");
     if (error) throw new Error(error.message);
+
+    if (row) {
+      const serviceName = (row.service as { name: string } | null)?.name ?? "service";
+      await notify(
+        context.supabase,
+        context.userId,
+        `Request cancelled: ${serviceName}`,
+        `Your request ${row.code} has been cancelled. You can file a new one anytime.`,
+        "/account",
+      );
+    }
+
     return { ok: true as const };
   });
 

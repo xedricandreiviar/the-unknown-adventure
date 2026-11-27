@@ -43,6 +43,31 @@ export const submitProblemReport = createServerFn({ method: "POST" })
       .from("problem_reports")
       .insert({ ...data, photo_path: data.photo_path ?? null, user_id: context.userId });
     if (error) throw new Error(error.message);
+
+    // Notify the resident their report was received
+    await context.supabase.from("notifications").insert({
+      user_id: context.userId,
+      title:   `Problem report received: ${data.category}`,
+      body:    "Your report has been submitted. The barangay will review it and get back to you.",
+      link:    "/account",
+    });
+
+    // Notify all admins
+    const { data: admins } = await context.supabase
+      .from("user_roles")
+      .select("user_id")
+      .eq("role", "admin");
+    if (admins && admins.length > 0) {
+      await context.supabase.from("notifications").insert(
+        admins.map((a) => ({
+          user_id: a.user_id,
+          title:   `New problem report: ${data.category}`,
+          body:    data.description.slice(0, 120),
+          link:    "/admin/problems",
+        })),
+      );
+    }
+
     return { ok: true as const };
   });
 

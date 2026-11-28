@@ -4,18 +4,33 @@ using QuestPDF.Infrastructure;
 
 namespace WawaApi;
 
-/// <summary>Draws the report as an A4 PDF, ready to print.</summary>
-public static class ReportPdf
+/// <summary>
+/// Draws the barangay service report as a printable A4 PDF.
+///
+/// Inherits from BasePdf:
+///   - Reuses Manila offset, Stamp(), DrawBarangayHeader(), DrawSignatureBlock()
+///   - Overrides Build() with its own A4 report layout (polymorphism)
+/// </summary>
+public class ReportPdf : BasePdf               // ← Inheritance
 {
-    private static readonly TimeSpan Manila = TimeSpan.FromHours(8);
+    private readonly ReportData _data;
+    private readonly string _preparedBy;
 
-    private static string Stamp(DateTimeOffset value) =>
-        value.ToOffset(Manila).ToString("MMM d, yyyy h:mm tt");
+    public ReportPdf(ReportData data, string preparedBy)
+    {
+        _data       = data;
+        _preparedBy = preparedBy;
+    }
 
     private static string Label(string status) =>
-        System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(status.Replace('_', ' '));
+        System.Globalization.CultureInfo.InvariantCulture
+              .TextInfo.ToTitleCase(status.Replace('_', ' '));
 
-    public static byte[] Build(ReportData data, string preparedBy)
+    /// <summary>
+    /// Polymorphism: same method name as CertificatePdf.Build(), but produces
+    /// a completely different A4 report layout with summary tables.
+    /// </summary>
+    public override byte[] Build()             // ← Polymorphism (override)
     {
         QuestPDF.Settings.License = LicenseType.Community;
 
@@ -27,15 +42,15 @@ public static class ReportPdf
                 page.Margin(30);
                 page.DefaultTextStyle(style => style.FontSize(9));
 
+                // ── Header — uses inherited helper ─────────────────────────
                 page.Header().Column(column =>
                 {
-                    column.Item().AlignCenter().Text("Barangay Wawa United").FontSize(18).Bold();
-                    column.Item().AlignCenter().Text("Taguig City");
-                    column.Item().PaddingTop(4).AlignCenter().Text("Barangay Service Report").FontSize(13).SemiBold();
-                    column.Item().AlignCenter().Text($"Period: {Stamp(data.From)} to {Stamp(data.To)}");
-                    column.Item().PaddingTop(6).LineHorizontal(1);
+                    DrawBarangayHeader(column, "Barangay Service Report");
+                    column.Item().AlignCenter()
+                          .Text($"Period: {Stamp(_data.From)} to {Stamp(_data.To)}");
                 });
 
+                // ── Content ────────────────────────────────────────────────
                 page.Content().PaddingVertical(10).Column(column =>
                 {
                     column.Spacing(8);
@@ -43,23 +58,33 @@ public static class ReportPdf
                     column.Item().Text("Summary").Bold().FontSize(11);
                     column.Item().Table(table =>
                     {
-                        table.ColumnsDefinition(c => { c.RelativeColumn(); c.ConstantColumn(60); });
+                        table.ColumnsDefinition(c =>
+                        {
+                            c.RelativeColumn();
+                            c.ConstantColumn(60);
+                        });
+
                         void Row(string label, int value)
                         {
                             table.Cell().BorderBottom(0.5f).PaddingVertical(2).Text(label);
-                            table.Cell().BorderBottom(0.5f).PaddingVertical(2).AlignRight().Text(value.ToString());
+                            table.Cell().BorderBottom(0.5f).PaddingVertical(2)
+                                 .AlignRight().Text(value.ToString());
                         }
-                        Row("Requests received", data.Summary.RequestsReceived);
-                        Row("Requests completed", data.Summary.RequestsCompleted);
-                        Row("Requests rejected", data.Summary.RequestsRejected);
-                        Row("Requests cancelled by resident", data.Summary.RequestsCancelled);
-                        Row("Problem reports received", data.Summary.ProblemsReceived);
-                        Row("Problem reports resolved", data.Summary.ProblemsResolved);
-                        Row("Problem reports rejected", data.Summary.ProblemsRejected);
+
+                        Row("Requests received",              _data.Summary.RequestsReceived);
+                        Row("Requests completed",             _data.Summary.RequestsCompleted);
+                        Row("Requests rejected",              _data.Summary.RequestsRejected);
+                        Row("Requests cancelled by resident", _data.Summary.RequestsCancelled);
+                        Row("Problem reports received",       _data.Summary.ProblemsReceived);
+                        Row("Problem reports resolved",       _data.Summary.ProblemsResolved);
+                        Row("Problem reports rejected",       _data.Summary.ProblemsRejected);
                     });
 
-                    column.Item().PaddingTop(6).Text($"Service requests ({data.Requests.Count})").Bold().FontSize(11);
-                    if (data.Requests.Count == 0)
+                    // Service requests table
+                    column.Item().PaddingTop(6)
+                          .Text($"Service requests ({_data.Requests.Count})").Bold().FontSize(11);
+
+                    if (_data.Requests.Count == 0)
                     {
                         column.Item().Text("No request activity in this period.");
                     }
@@ -69,15 +94,18 @@ public static class ReportPdf
                         {
                             table.ColumnsDefinition(c =>
                             {
-                                c.ConstantColumn(80); c.RelativeColumn(2); c.RelativeColumn(2);
-                                c.RelativeColumn(2); c.ConstantColumn(70);
+                                c.ConstantColumn(80);
+                                c.RelativeColumn(2);
+                                c.RelativeColumn(2);
+                                c.RelativeColumn(2);
+                                c.ConstantColumn(70);
                             });
                             table.Header(header =>
                             {
                                 foreach (var title in new[] { "Reference", "Resident", "Service", "Filed", "Status" })
                                     header.Cell().Background(Colors.Grey.Lighten3).Padding(3).Text(title).Bold();
                             });
-                            foreach (var row in data.Requests)
+                            foreach (var row in _data.Requests)
                             {
                                 table.Cell().BorderBottom(0.5f).Padding(3).Text(row.Code);
                                 table.Cell().BorderBottom(0.5f).Padding(3).Text(row.Resident);
@@ -88,8 +116,11 @@ public static class ReportPdf
                         });
                     }
 
-                    column.Item().PaddingTop(6).Text($"Problem reports ({data.Problems.Count})").Bold().FontSize(11);
-                    if (data.Problems.Count == 0)
+                    // Problem reports table
+                    column.Item().PaddingTop(6)
+                          .Text($"Problem reports ({_data.Problems.Count})").Bold().FontSize(11);
+
+                    if (_data.Problems.Count == 0)
                     {
                         column.Item().Text("No problem reports in this period.");
                     }
@@ -99,15 +130,18 @@ public static class ReportPdf
                         {
                             table.ColumnsDefinition(c =>
                             {
-                                c.RelativeColumn(2); c.RelativeColumn(2); c.RelativeColumn(2);
-                                c.RelativeColumn(3); c.ConstantColumn(70);
+                                c.RelativeColumn(2);
+                                c.RelativeColumn(2);
+                                c.RelativeColumn(2);
+                                c.RelativeColumn(3);
+                                c.ConstantColumn(70);
                             });
                             table.Header(header =>
                             {
                                 foreach (var title in new[] { "Filed", "Resident", "Category / place", "Problem", "Status" })
                                     header.Cell().Background(Colors.Grey.Lighten3).Padding(3).Text(title).Bold();
                             });
-                            foreach (var row in data.Problems)
+                            foreach (var row in _data.Problems)
                             {
                                 table.Cell().BorderBottom(0.5f).Padding(3).Text(Stamp(row.CreatedAt));
                                 table.Cell().BorderBottom(0.5f).Padding(3).Text(row.Resident);
@@ -118,22 +152,12 @@ public static class ReportPdf
                         });
                     }
 
+                    // ── Signature block — uses inherited helper ────────────
                     column.Item().PaddingTop(30).Row(row =>
-                    {
-                        row.RelativeItem().Column(c =>
-                        {
-                            c.Item().BorderTop(1).PaddingTop(2).AlignCenter().Text(preparedBy).SemiBold();
-                            c.Item().AlignCenter().Text("Prepared by");
-                        });
-                        row.ConstantItem(40);
-                        row.RelativeItem().Column(c =>
-                        {
-                            c.Item().BorderTop(1).PaddingTop(2).AlignCenter().Text(" ");
-                            c.Item().AlignCenter().Text("Noted by (Punong Barangay / Secretary)");
-                        });
-                    });
+                        DrawSignatureBlock(row, _preparedBy));
                 });
 
+                // ── Footer ─────────────────────────────────────────────────
                 page.Footer().AlignCenter().Text(text =>
                 {
                     text.Span("Page ");

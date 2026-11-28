@@ -18,7 +18,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { ReviewPanel } from "@/components/review-panel";
 import { getMyProfile } from "@/lib/profiles.functions";
 import { getSiteData } from "@/lib/settings.functions";
-import { submitRequest } from "@/lib/queue.functions";
+import { submitRequest, getResidentQuotaInfo } from "@/lib/queue.functions";
 import {
   DETAILS_MIN_LENGTH,
   DETAILS_REQUIRED_SERVICE_CODES,
@@ -87,6 +87,7 @@ function RequestPage() {
   const siteFn = useServerFn(getSiteData);
   const profileFn = useServerFn(getMyProfile);
   const submitFn = useServerFn(submitRequest);
+  const quotaFn = useServerFn(getResidentQuotaInfo);
   const confirm = useConfirm();
 
   const [loading, setLoading] = useState(true);
@@ -102,6 +103,7 @@ function RequestPage() {
   const [submitError, setSubmitError] = useState("");
   const [submittedCode, setSubmittedCode] = useState("");
   const [reviewing, setReviewing] = useState(false);
+  const [quotaInfo, setQuotaInfo] = useState<{ quota: number; todayCount: number; isFull: boolean; targetDate?: string } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -130,6 +132,12 @@ function RequestPage() {
     return () => { active = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [siteFn, profileFn]);
+
+  // Load quota info separately (needs auth, so run after initial load)
+  useEffect(() => {
+    quotaFn().then(setQuotaInfo).catch(() => { /* non-fatal */ });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quotaFn]);
 
   const service = useMemo(
     () => services.find((item) => item.id === serviceId) ?? null,
@@ -169,6 +177,8 @@ function RequestPage() {
       const result = await submitFn({ data: { service_id: service.id, details: details.trim() } });
       setSubmittedCode(result.code);
       setPickupDate((result as unknown as { pickup_date?: string | null }).pickup_date ?? null);
+      // Refresh quota info so "file another" shows updated availability
+      quotaFn().then(setQuotaInfo).catch(() => { /* non-fatal */ });
     } catch (cause) {
       setSubmitError(cause instanceof Error ? cause.message : "Could not file the request.");
     } finally {
@@ -428,6 +438,46 @@ function RequestPage() {
               .
             </p>
           </section>
+
+          {/* Daily slot availability */}
+          {quotaInfo && (
+            <section className="border border-border p-4 space-y-2 text-sm">
+              <h2 className="font-display text-base font-semibold text-forest-deep">Slot availability</h2>
+              {/* Bar */}
+              <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${
+                    quotaInfo.isFull
+                      ? "bg-destructive"
+                      : quotaInfo.todayCount >= Math.ceil(quotaInfo.quota * 0.75)
+                      ? "bg-gold-deep"
+                      : "bg-forest"
+                  }`}
+                  style={{ width: `${Math.min(100, Math.round((quotaInfo.todayCount / quotaInfo.quota) * 100))}%` }}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {quotaInfo.isFull ? (
+                  <>
+                    <span className="font-semibold text-destructive">
+                      {quotaInfo.targetDate
+                        ? `Slots for ${new Date(quotaInfo.targetDate + "T00:00:00").toLocaleDateString("en-PH", { month: "short", day: "numeric" })} are full.`
+                        : "Today's slots are full."}
+                    </span>{" "}
+                    Your document will be ready the following working day.
+                  </>
+                ) : (
+                  <>
+                    {quotaInfo.quota - quotaInfo.todayCount} of {quotaInfo.quota} slots open
+                    {quotaInfo.targetDate
+                      ? ` for ${new Date(quotaInfo.targetDate + "T00:00:00").toLocaleDateString("en-PH", { weekday: "long", month: "short", day: "numeric" })}.`
+                      : "."}{" "}
+                    Your estimated pickup will be on that date.
+                  </>
+                )}
+              </p>
+            </section>
+          )}
 
           {service && (
             <section className="border border-border p-4">

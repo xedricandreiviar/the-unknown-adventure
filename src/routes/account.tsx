@@ -136,7 +136,7 @@ function AccountPage() {
   const [reservationPage, setReservationPage] = useState(1);
   const PAGE_SIZE = 5;
   const [busy, setBusy] = useState(false);
-  const [saved, setSaved] = useState(false); // locks the form after a successful save
+  const [saved, setSaved] = useState(false); // locks the form; set to true once profile is loaded with data
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -176,6 +176,9 @@ function AccountPage() {
         setNotifications(notificationRows);
         setReports(reportRows);
         setReleases(releaseRows);
+        // Lock the form if the profile already has the required fields filled in.
+        // A brand-new account (empty first_name) starts unlocked so the resident can fill it.
+        if (person.first_name.trim()) setSaved(true);
       })
       .catch((cause: unknown) => {
         if (active)
@@ -213,18 +216,29 @@ function AccountPage() {
     event.preventDefault();
     setError("");
     setMessage("");
+    const wasApproved = profile?.status === "approved";
     if (
       !(await confirm({
         title: "Do you want to save these changes to your profile?",
+        description: wasApproved
+          ? "Your account has been verified. Editing your profile will reset it to Pending and the barangay will need to verify you again before you can file requests."
+          : undefined,
         confirmLabel: "Yes, save",
       }))
     )
       return;
     setBusy(true);
     try {
-      await updateProfileFn({ data: { ...fields, birthdate: null, sex: "" } });
-      setMessage("Profile updated.");
-      setSaved(true); // lock the form
+      const result = await updateProfileFn({ data: { ...fields, birthdate: null, sex: "" } });
+      const didReset = (result as unknown as { resetToPending?: boolean }).resetToPending;
+      if (didReset && profile) {
+        // Reflect the status change locally so the banner appears immediately
+        setProfile({ ...profile, status: "pending", rejection_reason: null });
+        setMessage("Profile saved. Your account is now pending re-verification by the barangay.");
+      } else {
+        setMessage("Profile updated.");
+      }
+      setSaved(true);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not update your profile.");
     } finally {
@@ -430,7 +444,7 @@ function AccountPage() {
                 variant="outline"
                 onClick={() => { setSaved(false); setMessage(""); }}
               >
-                Edit
+                {profile.status === "approved" ? "Edit (requires re-verification)" : "Edit"}
               </Button>
             )}
           </div>

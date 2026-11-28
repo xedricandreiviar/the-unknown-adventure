@@ -37,11 +37,42 @@ export const updateMyProfile = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => profileUpdateSchema.parse(data))
   .handler(async ({ data, context }) => {
-    const values = Object.fromEntries(Object.entries(data).filter(([, value]) => value !== undefined)) as Database["public"]["Tables"]["profiles"]["Update"];
+    // Check current status so we know whether to reset to pending
+    const { data: current } = await context.supabase
+      .from("profiles")
+      .select("status")
+      .eq("id", context.userId)
+      .maybeSingle();
+
+    const values = Object.fromEntries(
+      Object.entries(data).filter(([, value]) => value !== undefined),
+    ) as Database["public"]["Tables"]["profiles"]["Update"];
     if (values.sex === "") values.sex = null;
-    const { error } = await context.supabase.from("profiles").update(values).eq("id", context.userId);
+
+    // If the account was approved, editing resets it to pending for re-verification
+    const wasApproved = (current as { status?: string } | null)?.status === "approved";
+    if (wasApproved) {
+      values.status = "pending";
+      values.rejection_reason = null;
+    }
+
+    const { error } = await context.supabase
+      .from("profiles")
+      .update(values)
+      .eq("id", context.userId);
     if (error) throw new Error(error.message);
-    return { ok: true as const };
+
+    if (wasApproved) {
+      await notify(
+        context.supabase,
+        context.userId,
+        "Profile updated — awaiting re-verification",
+        "Your profile changes have been saved. Your account is pending re-approval by the barangay.",
+        "/account",
+      );
+    }
+
+    return { ok: true as const, resetToPending: wasApproved };
   });
 
 export const adminListAccounts = createServerFn({ method: "GET" })

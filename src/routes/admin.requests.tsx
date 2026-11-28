@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Download, FileDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -94,6 +94,21 @@ function RequestsPage() {
     setRequests(rows);
     setQuota(q);
   }, [listFn, quotaFn]);
+
+  // Realtime: refresh the list and quota bar whenever a request is inserted or updated
+  const reloadRef = useRef(reload);
+  reloadRef.current = reload;
+  useEffect(() => {
+    const channel = supabase
+      .channel("admin-requests-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "service_requests" },
+        () => { void reloadRef.current(); },
+      )
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -203,22 +218,57 @@ function RequestsPage() {
     <div className="space-y-4">
       {/* Daily quota banner */}
       {quota && (
-        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 text-sm">
-          <span className="font-semibold text-forest-deep">Today ({quota.today})</span>
-          <span className="text-muted-foreground">
-            {quota.todayCount} of {quota.quota} daily slots used
-          </span>
-          <div className="flex-1 min-w-24">
-            <div className="h-2 rounded-full bg-muted overflow-hidden">
-              <div
-                className="h-full rounded-full bg-gold-deep transition-all"
-                style={{ width: `${Math.min(100, Math.round((quota.todayCount / quota.quota) * 100))}%` }}
-              />
-            </div>
+        <div className="rounded-lg border border-border bg-card px-4 py-3 text-sm space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="font-semibold text-forest-deep">
+              Next pickup day — {quota.today}
+            </span>
+            <span
+              className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                quota.todayCount >= quota.quota
+                  ? "bg-destructive/10 text-destructive"
+                  : quota.todayCount >= Math.ceil(quota.quota * 0.75)
+                  ? "bg-gold-soft text-gold-deep"
+                  : "bg-forest/10 text-forest"
+              }`}
+            >
+              {quota.todayCount >= quota.quota
+                ? "Full — new requests go to the next available day"
+                : `${quota.quota - quota.todayCount} of ${quota.quota} slots remaining`}
+            </span>
           </div>
-          <span className={`text-xs font-medium ${quota.todayCount >= quota.quota ? "text-destructive" : "text-forest"}`}>
-            {quota.todayCount >= quota.quota ? "Quota reached" : `${quota.quota - quota.todayCount} remaining`}
-          </span>
+          {/* Progress bar */}
+          <div className="relative h-3 w-full overflow-hidden rounded-full bg-muted">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${
+                quota.todayCount >= quota.quota
+                  ? "bg-destructive"
+                  : quota.todayCount >= Math.ceil(quota.quota * 0.75)
+                  ? "bg-gold-deep"
+                  : "bg-forest"
+              }`}
+              style={{ width: `${Math.min(100, Math.round((quota.todayCount / quota.quota) * 100))}%` }}
+              role="progressbar"
+              aria-valuenow={quota.todayCount}
+              aria-valuemin={0}
+              aria-valuemax={quota.quota}
+              aria-label={`${quota.todayCount} of ${quota.quota} daily slots used`}
+            />
+            {/* Slot tick marks */}
+            {Array.from({ length: quota.quota - 1 }, (_, i) => (
+              <div
+                key={i}
+                className="absolute top-0 h-full w-px bg-background/40"
+                style={{ left: `${((i + 1) / quota.quota) * 100}%` }}
+              />
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {quota.todayCount} / {quota.quota} requests assigned for pickup on {quota.today}.
+            {quota.todayCount >= quota.quota
+              ? " New requests will be assigned to the following working day (FIFO)."
+              : " Each accepted request fills one slot. FIFO order is maintained."}
+          </p>
         </div>
       )}
 

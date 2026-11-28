@@ -245,22 +245,54 @@ export const getRequestQuotaStats = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await assertAdmin(context);
-    const todayManila = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
 
-    const [settingsResult, countResult] = await Promise.all([
+    // Use compute_pickup_date() to find the current target date — this is the same
+    // date new requests will be assigned to, so the bar always reflects real remaining capacity.
+    const [settingsResult, pickupResult] = await Promise.all([
       context.supabase.from("site_settings").select("daily_quota").eq("id", 1).maybeSingle(),
-      context.supabase
-        .from("service_requests")
-        .select("id", { count: "exact", head: true })
-        .eq("pickup_date", todayManila)
-        .not("status", "in", '("cancelled","rejected")'),
+      context.supabase.rpc("compute_pickup_date"),
     ]);
 
+    const quota = (settingsResult.data as { daily_quota?: number } | null)?.daily_quota ?? 20;
+    const targetDate = (pickupResult.data as string | null) ?? new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
+
+    const countResult = await context.supabase
+      .from("service_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("pickup_date", targetDate)
+      .not("status", "in", '("cancelled","rejected")');
+
     return {
-      quota: (settingsResult.data as { daily_quota?: number } | null)?.daily_quota ?? 20,
+      quota,
       todayCount: countResult.count ?? 0,
-      today: todayManila,
+      today: targetDate,
     };
+  });
+
+/**
+ * Public (authenticated residents) version of quota stats.
+ * Returns how many of the next pickup day's slots are taken so the resident form can
+ * warn them about overflow pickup dates.
+ */
+export const getResidentQuotaInfo = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const [settingsResult, pickupResult] = await Promise.all([
+      context.supabase.from("site_settings").select("daily_quota").eq("id", 1).maybeSingle(),
+      context.supabase.rpc("compute_pickup_date"),
+    ]);
+
+    const quota = (settingsResult.data as { daily_quota?: number } | null)?.daily_quota ?? 20;
+    const targetDate = (pickupResult.data as string | null) ?? new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
+
+    const countResult = await context.supabase
+      .from("service_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("pickup_date", targetDate)
+      .not("status", "in", '("cancelled","rejected")');
+
+    const todayCount = countResult.count ?? 0;
+    return { quota, todayCount, isFull: todayCount >= quota, targetDate };
   });
 
 export const adminUpdateRequest = createServerFn({ method: "POST" })
